@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math/rand"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/config"
@@ -26,8 +25,8 @@ func main() {
 
 	allURLs := domain.GenerateURLs(domains, paths, &cfg)
 
-	fmt.Printf("%s\n", allURLs)
-	syscall.Exit(0)
+	//fmt.Printf("%s\n", allURLs)
+	//syscall.Exit(0)
 
 	fmt.Printf("Scanning %d domains with %d paths\n", len(domains), len(paths))
 	fmt.Printf("Generated %d URLs\n", len(allURLs))
