@@ -34,6 +34,8 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		return
 	}
 
+	// Check file size
+
 	// Check for markers in the partial content
 	markerFound := false
 	for _, marker := range markers {
@@ -44,7 +46,10 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		}
 	}
 
-	// Check file size
+	if markerFound {
+		return
+	}
+
 	if result.FileSize >= cfg.MinFileSize {
 		fmt.Printf("\nFound large file (%d bytes, type: %s) at %s\n", result.FileSize, result.ContentType, result.URL)
 		return
