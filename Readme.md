@@ -2,16 +2,20 @@
 
 ## Overview
 
-Dynamic File Searcher is an advanced, Go-based CLI tool designed for intelligent and deep web crawling. Its unique strength lies in its ability to dynamically generate and explore paths based on the target hosts, allowing for much deeper and more comprehensive scans than traditional tools.
+Dynamic File Searcher is an advanced, Go-based CLI tool designed for intelligent and deep web crawling. Its unique
+strength lies in its ability to dynamically generate and explore paths based on the target hosts, allowing for much
+deeper and more comprehensive scans than traditional tools.
 
 ### Key Differentiators
 
 - Dynamic path generation based on host structure for deeper, more intelligent scans
 - Optional base paths for advanced URL generation
 
-While powerful alternatives like nuclei exist, Dynamic File Searcher offers easier handling and more flexibility in path generation compared to static, template-based approaches.
+While powerful alternatives like nuclei exist, Dynamic File Searcher offers easier handling and more flexibility in path
+generation compared to static, template-based approaches.
 
 ### Examples of Use Cases
+
 Imagine this being your input data:
 
 - Domain: vendorgo.abc.targetdomain.com
@@ -25,14 +29,15 @@ The tool will generate paths like:
 - https://vendorgo.abc.targetdomain.com/vendor-qa/env
 - ... and many more
 
-If you add base-paths like "..;/" to the mix, the tool will generate even more paths:
+If you add base-paths like "admin/" to the mix, the tool will generate even more paths:
 
-- https://vendorgo.abc.targetdomain.com/..;/env
-- https://vendorgo.abc.targetdomain.com/..;/vendorgo/env
-- https://vendorgo.abc.targetdomain.com/..;/vendor-qa/env
+- https://vendorgo.abc.targetdomain.com/admin/env
+- https://vendorgo.abc.targetdomain.com/admin/vendorgo/env
+- https://vendorgo.abc.targetdomain.com/admin/vendor-qa/env
 - ... and many more
 
-If you know what you are doing, this tool can be a powerful ally in your arsenal in finding issues in web applications that common web application scanners will certainly miss.
+If you know what you are doing, this tool can be a powerful ally in your arsenal in finding issues in web applications
+that common web application scanners will certainly miss.
 
 ## Features
 
@@ -88,7 +93,8 @@ or
 - `-domain`: Single domain to scan (alternative to `-domains`)
 - `-paths`: File containing a list of paths to check on each domain (required)
 - `-markers`: File containing a list of content markers to search for (optional)
-- `-base-paths`: File containing list of base paths for additional URL generation (optional) (e.g., "..;/" - it should be one per line and end with "/")
+- `-base-paths`: File containing list of base paths for additional URL generation (optional) (e.g., "..;/" - it should
+  be one per line and end with "/")
 - `-concurrency`: Number of concurrent requests (default: 100)
 - `-check-protocol`: Perform protocol check (determines if HTTP or HTTPS is supported) (default: false)
 - `-timeout`: Timeout for each request (default: 12s)
@@ -132,22 +138,25 @@ or
 2. It reads the list of paths from the specified `-paths` file.
 3. If provided, it reads additional base paths from the `-base-paths` file.
 4. It analyzes each domain to extract meaningful components (subdomains, main domain, etc.).
-5. Using these components and the provided paths (and base paths if available), it dynamically generates a comprehensive set of URLs to scan.
+5. Using these components and the provided paths (and base paths if available), it dynamically generates a comprehensive
+   set of URLs to scan.
 6. Concurrent workers send HTTP GET requests to these URLs.
 7. For each response:
-   - The tool reads up to `max-content-size` bytes for marker checking.
-   - It determines the full file size by reading (and discarding) the remaining content.
-   - The response is analyzed based on:
-      * Presence of specified content markers in the read portion (if markers are provided)
-      * Total file size (compared against `min-size`)
-      * HTTP status code
+    - The tool reads up to `max-content-size` bytes for marker checking.
+    - It determines the full file size by reading (and discarding) the remaining content.
+    - The response is analyzed based on:
+        * Presence of specified content markers in the read portion (if markers are provided)
+        * Total file size (compared against `min-size`)
+        * HTTP status code
 8. Results are reported in real-time, with a progress bar indicating overall completion.
 
-This approach allows for efficient scanning of both small and large files, balancing thorough marker checking with memory-efficient handling of large files.
+This approach allows for efficient scanning of both small and large files, balancing thorough marker checking with
+memory-efficient handling of large files.
 
 ## Large File Handling
 
 The tool efficiently handles large files and octet streams by:
+
 - Reading a configurable portion of the file for marker checking
 - Determining the full file size without loading the entire file into memory
 - Reporting both on file size and marker presence, even for partially read files
@@ -163,9 +172,9 @@ This allows for effective scanning of large files without running into memory is
 
 ## Limitations
 
-- The tool currently only supports HTTP(s)-GET requests.
 - There's no built-in rate limiting (use the concurrency option to control request rate).
-- Very large scale scans might require significant bandwidth and processing power.
+- Very large scale scans might require significant bandwidth and processing power, it is recommended to seperate the
+  input files and run multiple instances of the tool on different machines.
 
 ## Contributing
 
@@ -177,4 +186,5 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Disclaimer
 
-This tool is for educational and authorized testing purposes only. Misuse of this tool may be illegal. The authors are not responsible for any unauthorized use or damage caused by this tool.
+This tool is for educational and authorized testing purposes only. Misuse of this tool may be illegal. The authors are
+not responsible for any unauthorized use or damage caused by this tool.
