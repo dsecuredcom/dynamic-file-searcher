@@ -31,7 +31,9 @@ If you add base-paths like "..;/" to the mix, the tool will generate even more p
 - https://vendorgo.abc.targetdomain.com/..;/vendorgo/env
 - https://vendorgo.abc.targetdomain.com/..;/vendor-qa/env
 - ... and many more
-- 
+
+If you know what you are doing, this tool can be a powerful ally in your arsenal in finding issues in web applications that common web application scanners will certainly miss.
+
 ## Features
 
 - Intelligent path generation based on host structure
