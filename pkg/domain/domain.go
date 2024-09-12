@@ -203,11 +203,16 @@ func GenerateURLs(domains, paths []string, cfg *config.Config) ([]string, int) {
 			allURLs = append(allURLs, fmt.Sprintf("%s://%s/%s", dp.protocol, dp.domain, path))
 
 			words := splitDomain(dp.domain)
-			for _, word := range words {
-				allURLs = append(allURLs, fmt.Sprintf("%s://%s/%s/%s", dp.protocol, dp.domain, word, path))
 
-				for _, basePath := range cfg.BasePaths {
-					allURLs = append(allURLs, fmt.Sprintf("%s://%s/%s%s/%s", dp.protocol, dp.domain, basePath, word, path))
+			if len(cfg.BasePaths) == 0 {
+				for _, word := range words {
+					allURLs = append(allURLs, fmt.Sprintf("%s://%s/%s/%s", dp.protocol, dp.domain, word, path))
+				}
+			} else {
+				for _, word := range words {
+					for _, basePath := range cfg.BasePaths {
+						allURLs = append(allURLs, fmt.Sprintf("%s://%s/%s%s/%s", dp.protocol, dp.domain, basePath, word, path))
+					}
 				}
 			}
 		}
