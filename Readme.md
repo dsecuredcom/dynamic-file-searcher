@@ -133,7 +133,7 @@ or
 
 6. Use static word separator for more targeted searches:
    ```
-   ./dynamic_file_searcher -domain example.com -paths paths.txt -markers markers.txt -use-static-separator -static-separator-file static_words.txt
+   ./dynamic_file_searcher -domain example.com -paths paths.txt -markers markers.txt -use-static-separator -static-separator-file input/english-words.txt
    ```
 
 7. Perform protocol check and increase concurrency:
