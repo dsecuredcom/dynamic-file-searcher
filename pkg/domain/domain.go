@@ -24,6 +24,50 @@ var blacklistedWords = []string{
 	"errors&#46;edgesuite&#46;net",
 }
 
+var (
+	ipv4Regex         = regexp.MustCompile(`^(\d{1,3}\.){3}\d{1,3}$`)
+	ipv6Regex         = regexp.MustCompile(`^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$`)
+	ipPartRegex       = regexp.MustCompile(`(\d{1,3}[-\.]\d{1,3}[-\.]\d{1,3}[-\.]\d{1,3})`)
+	md5Regex          = regexp.MustCompile(`^[a-fA-F0-9]{32}$`)
+	onlyAlphaRegex    = regexp.MustCompile(`^[a-z]+$`)
+	envRegex          = regexp.MustCompile(`prod|qa|dev|stage|test|uat|stg|stg`)
+	numberSuffixRegex = regexp.MustCompile(`\d+$`)
+	envWords          = []string{"-prod", "-qa", "-dev", "-stage", "-test", "-uat", "-stg", "qa", "dev", "test"}
+)
+
+var commonTLDs = []string{
+	// Multi-part TLDs
+	"co.uk", "co.jp", "co.nz", "co.za", "com.au", "com.br", "com.cn", "com.mx", "com.tr", "com.tw",
+	"edu.au", "edu.cn", "edu.hk", "edu.sg", "gov.uk", "net.au", "net.cn", "org.au", "org.uk",
+	"ac.uk", "ac.nz", "ac.jp", "ac.kr", "ne.jp", "or.jp", "org.nz", "govt.nz", "sch.uk", "nhs.uk",
+
+	// Generic TLDs (gTLDs)
+	"com", "org", "net", "edu", "gov", "int", "mil", "aero", "biz", "cat", "coop", "info", "jobs",
+	"mobi", "museum", "name", "pro", "tel", "travel", "xxx", "asia", "arpa",
+
+	// New gTLDs
+	"app", "dev", "io", "ai", "cloud", "digital", "online", "store", "tech", "site", "website",
+	"blog", "shop", "agency", "expert", "software", "studio", "design", "education", "healthcare",
+
+	// Country Code TLDs (ccTLDs)
+	"ac", "ad", "ae", "af", "ag", "ai", "al", "am", "an", "ao", "aq", "ar", "as", "at", "au", "aw",
+	"ax", "az", "ba", "bb", "bd", "be", "bf", "bg", "bh", "bi", "bj", "bm", "bn", "bo", "br", "bs",
+	"bt", "bv", "bw", "by", "bz", "ca", "cc", "cd", "cf", "cg", "ch", "ci", "ck", "cl", "cm", "cn",
+	"co", "cr", "cu", "cv", "cx", "cy", "cz", "de", "dj", "dk", "dm", "do", "dz", "ec", "ee", "eg",
+	"er", "es", "et", "eu", "fi", "fj", "fk", "fm", "fo", "fr", "ga", "gb", "gd", "ge", "gf", "gg",
+	"gh", "gi", "gl", "gm", "gn", "gp", "gq", "gr", "gs", "gt", "gu", "gw", "gy", "hk", "hm", "hn",
+	"hr", "ht", "hu", "id", "ie", "il", "im", "in", "io", "iq", "ir", "is", "it", "je", "jm", "jo",
+	"jp", "ke", "kg", "kh", "ki", "km", "kn", "kp", "kr", "kw", "ky", "kz", "la", "lb", "lc", "li",
+	"lk", "lr", "ls", "lt", "lu", "lv", "ly", "ma", "mc", "md", "me", "mg", "mh", "mk", "ml", "mm",
+	"mn", "mo", "mp", "mq", "mr", "ms", "mt", "mu", "mv", "mw", "mx", "my", "mz", "na", "nc", "ne",
+	"nf", "ng", "ni", "nl", "no", "np", "nr", "nu", "nz", "om", "pa", "pe", "pf", "pg", "ph", "pk",
+	"pl", "pm", "pn", "pr", "ps", "pt", "pw", "py", "qa", "re", "ro", "rs", "ru", "rw", "sa", "sb",
+	"sc", "sd", "se", "sg", "sh", "si", "sj", "sk", "sl", "sm", "sn", "so", "sr", "st", "su", "sv",
+	"sy", "sz", "tc", "td", "tf", "tg", "th", "tj", "tk", "tl", "tm", "tn", "to", "tp", "tr", "tt",
+	"tv", "tw", "tz", "ua", "ug", "uk", "us", "uy", "uz", "va", "vc", "ve", "vg", "vi", "vn", "vu",
+	"wf", "ws", "ye", "yt", "za", "zm", "zw",
+}
+
 func isBlacklisted(content string) bool {
 	lowerContent := strings.ToLower(content)
 	for _, word := range blacklistedWords {
@@ -174,96 +218,142 @@ func GenerateURLs(domains, paths []string, cfg *config.Config) ([]string, int) {
 	return allURLs, len(domainProtocols)
 }
 
-func splitDomain(domain string) []string {
-	if isIPAddress(domain) {
+func splitDomain(host string) []string {
+
+	if ipv4Regex.MatchString(host) || ipv6Regex.MatchString(host) {
 		return []string{}
 	}
 
-	parts := strings.Split(domain, ".")
-	results := make(map[string]bool)
+	// Naive approach but lol
+	host = ipPartRegex.ReplaceAllString(host, "")
+	host = md5Regex.ReplaceAllString(host, "")
+	host = removeTLD(host)
 
-	results[domain] = true
+	parts := strings.Split(host, ".")
 
-	filteredParts := filterParts(parts)
-
-	subdomainParts := filteredParts[:len(filteredParts)-2]
-	domainParts := filteredParts[len(filteredParts)-2:]
-
-	subdomain := strings.Join(subdomainParts, ".")
-	results[subdomain] = true
-	for _, part := range subdomainParts {
-		results[part] = true
-		results[part+"1"] = true
+	relevantParts := parts
+	if len(parts) > 3 {
+		relevantParts = parts[:3]
 	}
 
-	domain = strings.Join(domainParts, ".")
-	results[domain] = true
-	results[domainParts[0]] = true
-	results[domainParts[0]+"1"] = true
-
-	baseWords := []string{subdomain}
-	baseWords = append(baseWords, subdomainParts...)
-	baseWords = append(baseWords, domainParts[0])
-
-	extendedWords := generateExtendedWords(baseWords)
-	for _, word := range extendedWords {
-		results[word] = true
+	var words []string
+	for _, part := range relevantParts {
+		words = CombineUniqueStringSlices(words, extractWords(part))
 	}
 
-	finalResults := make([]string, 0, len(results))
-	for word := range results {
-		finalResults = append(finalResults, word)
-	}
+	filteredWords := filterWords(words)
 
-	return finalResults
+	return filteredWords
 }
 
-func filterParts(parts []string) []string {
-	var filteredParts []string
-	for _, part := range parts {
-		if !isRegion(part) {
-			if isEnvironment(part) {
-				envParts := strings.Split(part, "-")
-				if len(envParts) > 1 {
-					filteredParts = append(filteredParts, envParts[len(envParts)-1])
+func extractWords(part string) []string {
+	subparts := regexp.MustCompile(`[._-]`).Split(part, -1)
+
+	words := make(map[string]bool)
+
+	for _, subpart := range subparts {
+		if subpart != "" {
+			words[subpart] = true
+		}
+
+		if numberSuffixRegex.MatchString(subpart) {
+			words[numberSuffixRegex.ReplaceAllString(subpart, "")] = true
+		}
+
+	}
+
+	for subpart, _ := range words {
+		if onlyAlphaRegex.MatchString(subpart) {
+
+			if envRegex.MatchString(subpart) {
+				continue
+			}
+			for _, word := range envWords {
+				if strings.Contains(subpart, word) {
+					break
 				}
-			} else {
-				filteredParts = append(filteredParts, part)
+
+				words[subpart+word] = true
 			}
 		}
 	}
-	return filteredParts
-}
 
-func isRegion(s string) bool {
-	regionPattern := regexp.MustCompile(`^[a-z]{2}-[a-z]+-\d+$`)
-	return regionPattern.MatchString(s)
-}
+	words[part] = true
 
-func isEnvironment(s string) bool {
-	envPattern := regexp.MustCompile(`^(prod|dev|stage|test|qa|stg|uat)$`)
-	return envPattern.MatchString(s)
-}
-
-func generateExtendedWords(baseWords []string) []string {
-	suffixes := []string{"qa", "dev", "stage", "prod", "test", "stg", "uat", "admin"}
-	var extendedWords []string
-	for _, word := range baseWords {
-
-		if word == "" {
-			continue
+	if strings.Contains(part, "-") {
+		hyphenParts := strings.Split(part, "-")
+		for i := 1; i <= len(hyphenParts); i++ {
+			words[strings.Join(hyphenParts[:i], "-")] = true
 		}
 
-		if !strings.Contains(word, ".") {
-			for _, suffix := range suffixes {
-				extendedWords = append(extendedWords, word+"-"+suffix, word+suffix)
+		for _, hyphenPart := range hyphenParts[1:] {
+			words[hyphenPart] = true
+		}
+	}
+
+	var FilteredWords []string
+	for word := range words {
+		FilteredWords = append(FilteredWords, word)
+	}
+
+	return FilteredWords
+}
+
+func filterWords(words []string) []string {
+	var filteredWords []string
+	for _, word := range words {
+		if !shouldFilterWord(word) {
+			filteredWords = append(filteredWords, word)
+		}
+	}
+	return filteredWords
+}
+
+func shouldFilterWord(word string) bool {
+
+	if strings.Count(word, "-")+strings.Count(word, "_") > 2 {
+		return true
+	}
+
+	for _, env := range envWords {
+		if strings.HasPrefix(word, env) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func CombineUniqueStringSlices(slice1, slice2 []string) []string {
+	uniqueMap := make(map[string]bool)
+
+	for _, s := range slice1 {
+		uniqueMap[s] = true
+	}
+	for _, s := range slice2 {
+		uniqueMap[s] = true
+	}
+
+	combined := make([]string, 0, len(uniqueMap))
+	for s := range uniqueMap {
+		combined = append(combined, s)
+	}
+
+	return combined
+}
+
+func removeTLD(host string) string {
+	host = strings.ToLower(host)
+	parts := strings.Split(host, ".")
+
+	for i := 0; i < len(parts); i++ {
+		potentialTLD := strings.Join(parts[i:], ".")
+		for _, tld := range commonTLDs {
+			if potentialTLD == tld {
+				return strings.Join(parts[:i], ".")
 			}
 		}
 	}
-	return extendedWords
-}
 
-func isIPAddress(s string) bool {
-	ipPattern := regexp.MustCompile(`^(\d{1,3}\.){3}\d{1,3}$`)
-	return ipPattern.MatchString(s)
+	return host
 }
