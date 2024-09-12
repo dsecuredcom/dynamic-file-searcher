@@ -32,7 +32,7 @@ var (
 	onlyAlphaRegex    = regexp.MustCompile(`^[a-z]+$`)
 	envRegex          = regexp.MustCompile(`prod|qa|dev|stage|test|uat|stg|stg`)
 	numberSuffixRegex = regexp.MustCompile(`\d+$`)
-	envWords          = []string{"-prod", "-qa", "-dev", "-stage", "-test", "-uat", "-stg", "qa", "dev", "test"}
+	envWords          = []string{"-prod", "-qa", "-dev", "-stage", "-test", "-uat", "-stg", "qa", "dev", "test", "-v1", "-v2", "1"}
 )
 
 var commonTLDs = []string{
@@ -331,6 +331,8 @@ func shouldFilterWord(word string) bool {
 		return true
 	}
 
+	// @todo: add more filters
+	// makes no sense, check here.
 	for _, env := range envWords {
 		if strings.HasPrefix(word, env) {
 			return true
