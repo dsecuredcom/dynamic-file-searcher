@@ -2,17 +2,15 @@
 
 ## Overview
 
-Dynamic File Searcher is an advanced, Go-based CLI tool designed for intelligent and deep web crawling. Its unique
-strength lies in its ability to dynamically generate and explore paths based on the target hosts, allowing for much
-deeper and more comprehensive scans than traditional tools.
+Dynamic File Searcher is an advanced, Go-based CLI tool designed for intelligent and deep web crawling. Its unique strength lies in its ability to dynamically generate and explore paths based on the target hosts, allowing for much deeper and more comprehensive scans than traditional tools.
 
 ### Key Differentiators
 
 - Dynamic path generation based on host structure for deeper, more intelligent scans
 - Optional base paths for advanced URL generation
+- Flexible word separation options for more targeted searches
 
-While powerful alternatives like nuclei exist, Dynamic File Searcher offers easier handling and more flexibility in path
-generation compared to static, template-based approaches.
+While powerful alternatives like nuclei exist, Dynamic File Searcher offers easier handling and more flexibility in path generation compared to static, template-based approaches.
 
 ### Examples of Use Cases
 
@@ -36,8 +34,7 @@ If you add base-paths like "admin/" to the mix, the tool will generate even more
 - https://vendorgo.abc.targetdomain.com/admin/vendorgo-qa/env
 - ... and many more
 
-If you know what you are doing, this tool can be a powerful ally in your arsenal in finding issues in web applications
-that common web application scanners will certainly miss.
+If you know what you are doing, this tool can be a powerful ally in your arsenal for finding issues in web applications that common web application scanners will certainly miss.
 
 ## Features
 
@@ -53,6 +50,7 @@ that common web application scanners will certainly miss.
 - Skipping certain domains when WAF is detected
 - Proxy support for anonymous scanning
 - Verbose mode for detailed output and analysis
+- Static word separator option for more targeted searches
 
 ## Installation
 
@@ -93,9 +91,8 @@ or
 - `-domain`: Single domain to scan (alternative to `-domains`)
 - `-paths`: File containing a list of paths to check on each domain (required)
 - `-markers`: File containing a list of content markers to search for (optional)
-- `-base-paths`: File containing list of base paths for additional URL generation (optional) (e.g., "..;/" - it should
-  be one per line and end with "/")
-- `-concurrency`: Number of concurrent requests (default: 100)
+- `-base-paths`: File containing list of base paths for additional URL generation (optional) (e.g., "..;/" - it should be one per line and end with "/")
+- `-concurrency`: Number of concurrent requests (default: 10)
 - `-check-protocol`: Perform protocol check (determines if HTTP or HTTPS is supported) (default: false)
 - `-timeout`: Timeout for each request (default: 12s)
 - `-verbose`: Enable verbose output
@@ -104,6 +101,8 @@ or
 - `-status`: HTTP status code to filter (default: 200)
 - `-headers`: Extra headers to add to each request (format: 'Header1:Value1,Header2:Value2')
 - `-proxy`: Proxy URL (e.g., http://127.0.0.1:8080)
+- `-use-static-separator`: Use static word separator (default: false)
+- `-static-separator-file`: File containing static words for separation (required if `-use-static-separator` is true)
 
 ### Examples
 
@@ -132,26 +131,40 @@ or
    ./dynamic_file_searcher -domain example.com -paths paths.txt -markers markers.txt -proxy http://127.0.0.1:8080 -status 403 -headers "User-Agent:CustomBot/1.0"
    ```
 
+6. Use static word separator for more targeted searches:
+   ```
+   ./dynamic_file_searcher -domain example.com -paths paths.txt -markers markers.txt -use-static-separator -static-separator-file static_words.txt
+   ```
+
+7. Perform protocol check and increase concurrency:
+   ```
+   ./dynamic_file_searcher -domains domains.txt -paths paths.txt -markers markers.txt -check-protocol -concurrency 50
+   ```
+
+8. Verbose output with custom timeout:
+   ```
+   ./dynamic_file_searcher -domain example.com -paths paths.txt -markers markers.txt -verbose -timeout 30s
+   ```
+
 ## How It Works
 
 1. The tool reads the domain(s) from either the `-domain` flag or the `-domains` file.
 2. It reads the list of paths from the specified `-paths` file.
 3. If provided, it reads additional base paths from the `-base-paths` file.
 4. It analyzes each domain to extract meaningful components (subdomains, main domain, etc.).
-5. Using these components and the provided paths (and base paths if available), it dynamically generates a comprehensive
-   set of URLs to scan.
-6. Concurrent workers send HTTP GET requests to these URLs.
-7. For each response:
-    - The tool reads up to `max-content-size` bytes for marker checking.
-    - It determines the full file size by reading (and discarding) the remaining content.
-    - The response is analyzed based on:
-        * Presence of specified content markers in the read portion (if markers are provided)
-        * Total file size (compared against `min-size`)
-        * HTTP status code
-8. Results are reported in real-time, with a progress bar indicating overall completion.
+5. Using these components and the provided paths (and base paths if available), it dynamically generates a comprehensive set of URLs to scan.
+6. If `-use-static-separator` is enabled, it uses the words from `-static-separator-file` for more targeted path generation. More complex words are seperated into smaller words, e.g. vendortool will generate "vendortool","vendor" and "tool".
+7. Concurrent workers send HTTP GET requests to these URLs.
+8. For each response:
+   - The tool reads up to `max-content-size` bytes for marker checking.
+   - It determines the full file size by reading (and discarding) the remaining content.
+   - The response is analyzed based on:
+      * Presence of specified content markers in the read portion (if markers are provided)
+      * Total file size (compared against `min-size`)
+      * HTTP status code
+9. Results are reported in real-time, with a progress bar indicating overall completion.
 
-This approach allows for efficient scanning of both small and large files, balancing thorough marker checking with
-memory-efficient handling of large files.
+This approach allows for efficient scanning of both small and large files, balancing thorough marker checking with memory-efficient handling of large files.
 
 ## Large File Handling
 
@@ -173,8 +186,7 @@ This allows for effective scanning of large files without running into memory is
 ## Limitations
 
 - There's no built-in rate limiting (use the concurrency option to control request rate).
-- Very large scale scans might require significant bandwidth and processing power, it is recommended to seperate the
-  input files and run multiple instances of the tool on different machines.
+- Very large scale scans might require significant bandwidth and processing power. It is recommended to separate the input files and run multiple instances of the tool on different machines.
 
 ## Contributing
 
@@ -184,7 +196,10 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
+# English word list
+
+The list is taken from https://github.com/dwyl/english-words/ ! Thanks for that!
+
 ## Disclaimer
 
-This tool is for educational and authorized testing purposes only. Misuse of this tool may be illegal. The authors are
-not responsible for any unauthorized use or damage caused by this tool.
+This tool is for educational and authorized testing purposes only. Misuse of this tool may be illegal. The authors are not responsible for any unauthorized use or damage caused by this tool.

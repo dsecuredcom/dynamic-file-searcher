@@ -11,21 +11,24 @@ import (
 )
 
 type Config struct {
-	DomainsFile          string
-	Domain               string
-	PathsFile            string
-	MarkersFile          string
-	BasePathsFile        string
-	Concurrency          int
-	Timeout              time.Duration
-	Verbose              bool
-	ProxyURL             *url.URL
-	ExtraHeaders         map[string]string
-	MinFileSize          int64
-	MaxContentSize       int64
-	HTTPStatusCode       int
-	BasePaths            []string
-	PerformProtocolCheck bool
+	DomainsFile             string
+	Domain                  string
+	PathsFile               string
+	MarkersFile             string
+	BasePathsFile           string
+	Concurrency             int
+	Timeout                 time.Duration
+	Verbose                 bool
+	ProxyURL                *url.URL
+	ExtraHeaders            map[string]string
+	MinFileSize             int64
+	MaxContentSize          int64
+	HTTPStatusCode          int
+	BasePaths               []string
+	PerformProtocolCheck    bool
+	UseStaticWordSeparator  bool
+	StaticWordSeparatorFile string
+	StaticWords             []string
 }
 
 func ParseFlags() Config {
@@ -41,6 +44,8 @@ func ParseFlags() Config {
 	flag.BoolVar(&cfg.PerformProtocolCheck, "check-protocol", false, "Perform protocol check (determines if HTTP or HTTPS is supported)")
 	flag.DurationVar(&cfg.Timeout, "timeout", 12*time.Second, "Timeout for each request")
 	flag.BoolVar(&cfg.Verbose, "verbose", false, "Verbose output")
+	flag.BoolVar(&cfg.UseStaticWordSeparator, "use-static-separator", false, "Use static word separator")
+	flag.StringVar(&cfg.StaticWordSeparatorFile, "static-separator-file", "", "File containing static words for separation")
 	flag.Int64Var(&cfg.MinFileSize, "min-size", 0, "Minimum file size to detect (in bytes)")
 	flag.Int64Var(&cfg.MaxContentSize, "max-content-size", 5*1024*1024, "Maximum size of content to read for marker checking (in bytes)")
 	flag.IntVar(&cfg.HTTPStatusCode, "status", 200, "HTTP status code to filter")
@@ -87,7 +92,44 @@ func ParseFlags() Config {
 		}
 	}
 
+	if cfg.UseStaticWordSeparator {
+		if cfg.StaticWordSeparatorFile == "" {
+			fmt.Println("Please provide a file with static words when using -use-static-separator")
+			flag.PrintDefaults()
+			os.Exit(1)
+		}
+		var err error
+		cfg.StaticWords, err = loadStaticWords(cfg.StaticWordSeparatorFile)
+		if err != nil {
+			fmt.Printf("Error loading static words: %v\n", err)
+			os.Exit(1)
+		}
+	}
+
 	return cfg
+}
+
+func loadStaticWords(filename string) ([]string, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	var words []string
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		word := strings.TrimSpace(scanner.Text())
+		if len(word) > 4 {
+			words = append(words, word)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, err
+	}
+
+	return words, nil
 }
 
 func readBasePaths(filename string) ([]string, error) {

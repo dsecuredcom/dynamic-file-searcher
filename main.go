@@ -46,6 +46,13 @@ func main() {
 		color.Cyan("[*] Skipping protocol check, using HTTPS for all domains...")
 	}
 
+	if cfg.UseStaticWordSeparator {
+		color.Cyan("[*] Static word separation is active")
+		color.Cyan("[*] Loaded %d entries for word separation", len(cfg.StaticWords))
+	} else {
+		color.Cyan("[*] Using default word separation")
+	}
+
 	start := time.Now()
 	allURLs, validDomainCount := domain.GenerateURLs(initialDomains, paths, &cfg)
 	elapsed := time.Since(start)

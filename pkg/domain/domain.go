@@ -202,7 +202,7 @@ func GenerateURLs(domains, paths []string, cfg *config.Config) ([]string, int) {
 		for _, path := range paths {
 			allURLs = append(allURLs, fmt.Sprintf("%s://%s/%s", dp.protocol, dp.domain, path))
 
-			words := splitDomain(dp.domain)
+			words := splitDomain(dp.domain, cfg)
 
 			if len(cfg.BasePaths) == 0 {
 				for _, word := range words {
@@ -223,7 +223,7 @@ func GenerateURLs(domains, paths []string, cfg *config.Config) ([]string, int) {
 	return allURLs, len(domainProtocols)
 }
 
-func splitDomain(host string) []string {
+func splitDomain(host string, cfg *config.Config) []string {
 
 	if ipv4Regex.MatchString(host) || ipv6Regex.MatchString(host) {
 		return []string{}
@@ -236,14 +236,25 @@ func splitDomain(host string) []string {
 
 	parts := strings.Split(host, ".")
 
+	var words []string
+
 	relevantParts := parts
 	if len(parts) > 3 {
 		relevantParts = parts[:3]
 	}
 
-	var words []string
 	for _, part := range relevantParts {
 		words = CombineUniqueStringSlices(words, extractWords(part))
+
+		if cfg.UseStaticWordSeparator && len(cfg.StaticWords) > 0 && onlyAlphaRegex.MatchString(part) {
+			for _, staticword := range cfg.StaticWords {
+				if strings.Contains(part, staticword) {
+					words = append(words, staticword)
+					words = append(words, strings.ReplaceAll(part, staticword, ""))
+				}
+			}
+		}
+
 	}
 
 	filteredWords := filterWords(words)
