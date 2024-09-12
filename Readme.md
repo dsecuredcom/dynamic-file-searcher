@@ -26,14 +26,14 @@ The tool will generate paths like:
 
 - https://vendorgo.abc.targetdomain.com/env
 - https://vendorgo.abc.targetdomain.com/vendorgo/env
-- https://vendorgo.abc.targetdomain.com/vendor-qa/env
+- https://vendorgo.abc.targetdomain.com/vendorgo-qa/env
 - ... and many more
 
 If you add base-paths like "admin/" to the mix, the tool will generate even more paths:
 
 - https://vendorgo.abc.targetdomain.com/admin/env
 - https://vendorgo.abc.targetdomain.com/admin/vendorgo/env
-- https://vendorgo.abc.targetdomain.com/admin/vendor-qa/env
+- https://vendorgo.abc.targetdomain.com/admin/vendorgo-qa/env
 - ... and many more
 
 If you know what you are doing, this tool can be a powerful ally in your arsenal in finding issues in web applications
