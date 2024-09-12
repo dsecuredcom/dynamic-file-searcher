@@ -40,18 +40,30 @@ func main() {
 
 	rand.Seed(time.Now().UnixNano())
 
-	color.Cyan("[*] Checking protocols and blacklist for %d domains concurrently...", len(initialDomains))
+	if cfg.PerformProtocolCheck {
+		color.Cyan("[*] Checking protocols and blacklist for %d domains concurrently...", len(initialDomains))
+	} else {
+		color.Cyan("[*] Skipping protocol check, using HTTPS for all domains...")
+	}
+
 	start := time.Now()
 	allURLs, validDomainCount := domain.GenerateURLs(initialDomains, paths, &cfg)
 	elapsed := time.Since(start)
 
-	color.Green("[✔] Protocol checks and blacklist filtering completed in %s", elapsed)
-	color.Cyan("[i] Scanning %d domains (out of initial %d) with %d paths", validDomainCount, len(initialDomains), len(paths))
+	if cfg.PerformProtocolCheck {
+		color.Green("[✔] Protocol checks and blacklist filtering completed in %s", elapsed)
+		color.Cyan("[i] Scanning %d domains (out of initial %d) with %d paths", validDomainCount, len(initialDomains), len(paths))
+	} else {
+		color.Green("[✔] URL generation completed in %s", elapsed)
+		color.Cyan("[i] Scanning %d domains with %d paths", validDomainCount, len(paths))
+	}
 	color.Cyan("[i] Generated %d URLs", len(allURLs))
 
-	blacklistedCount := len(initialDomains) - validDomainCount
-	if blacklistedCount > 0 {
-		color.Yellow("[!] Blacklisted %d domains due to detected protection mechanisms", blacklistedCount)
+	if cfg.PerformProtocolCheck {
+		blacklistedCount := len(initialDomains) - validDomainCount
+		if blacklistedCount > 0 {
+			color.Yellow("[!] Blacklisted %d domains due to detected protection mechanisms", blacklistedCount)
+		}
 	}
 
 	if len(cfg.BasePaths) > 0 {

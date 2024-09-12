@@ -11,20 +11,21 @@ import (
 )
 
 type Config struct {
-	DomainsFile    string
-	Domain         string
-	PathsFile      string
-	MarkersFile    string
-	BasePathsFile  string
-	Concurrency    int
-	Timeout        time.Duration
-	Verbose        bool
-	ProxyURL       *url.URL
-	ExtraHeaders   map[string]string
-	MinFileSize    int64
-	MaxContentSize int64
-	HTTPStatusCode int
-	BasePaths      []string
+	DomainsFile          string
+	Domain               string
+	PathsFile            string
+	MarkersFile          string
+	BasePathsFile        string
+	Concurrency          int
+	Timeout              time.Duration
+	Verbose              bool
+	ProxyURL             *url.URL
+	ExtraHeaders         map[string]string
+	MinFileSize          int64
+	MaxContentSize       int64
+	HTTPStatusCode       int
+	BasePaths            []string
+	PerformProtocolCheck bool
 }
 
 func ParseFlags() Config {
@@ -37,6 +38,7 @@ func ParseFlags() Config {
 	flag.StringVar(&cfg.MarkersFile, "markers", "", "File containing list of markers")
 	flag.StringVar(&cfg.BasePathsFile, "base-paths", "", "File containing list of base paths")
 	flag.IntVar(&cfg.Concurrency, "concurrency", 10, "Number of concurrent requests")
+	flag.BoolVar(&cfg.PerformProtocolCheck, "check-protocol", false, "Perform protocol check (determines if HTTP or HTTPS is supported)")
 	flag.DurationVar(&cfg.Timeout, "timeout", 12*time.Second, "Timeout for each request")
 	flag.BoolVar(&cfg.Verbose, "verbose", false, "Verbose output")
 	flag.Int64Var(&cfg.MinFileSize, "min-size", 0, "Minimum file size to detect (in bytes)")

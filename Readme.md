@@ -88,6 +88,7 @@ or
 - `-markers`: File containing a list of content markers to search for (optional)
 - `-base-paths`: File containing list of base paths for additional URL generation (optional) (e.g., "..;/" - it should be one per line and end with "/")
 - `-concurrency`: Number of concurrent requests (default: 100)
+- `-check-protocol`: Perform protocol check (determines if HTTP or HTTPS is supported) (default: false)
 - `-timeout`: Timeout for each request (default: 12s)
 - `-verbose`: Enable verbose output
 - `-min-size`: Minimum file size to detect, in bytes (default: 0)

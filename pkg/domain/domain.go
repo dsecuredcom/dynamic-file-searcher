@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/config"
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/utils"
+	"github.com/schollz/progressbar/v3"
 	"io"
 	"net/http"
 	"regexp"
@@ -52,12 +53,10 @@ func checkDomainProtocol(domain string, cfg *config.Config) (string, bool) {
 			return nil, err
 		}
 
-		// Set hardcoded headers
 		req.Header.Set("Referer", url)
 		req.Header.Set("Origin", url)
 		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
 
-		// Set extra headers from config
 		for key, value := range cfg.ExtraHeaders {
 			req.Header.Set(key, value)
 		}
@@ -65,7 +64,6 @@ func checkDomainProtocol(domain string, cfg *config.Config) (string, bool) {
 		return httpClient.Do(req)
 	}
 
-	// Try HTTPS first
 	resp, err := makeRequest("https")
 	if err == nil {
 		defer resp.Body.Close()
@@ -76,7 +74,6 @@ func checkDomainProtocol(domain string, cfg *config.Config) (string, bool) {
 		return "https", false
 	}
 
-	// If HTTPS fails, try HTTP
 	resp, err = makeRequest("http")
 	if err == nil {
 		defer resp.Body.Close()
@@ -87,7 +84,6 @@ func checkDomainProtocol(domain string, cfg *config.Config) (string, bool) {
 		return "http", false
 	}
 
-	// If both fail, default to HTTPS
 	return "https", false
 }
 
@@ -98,6 +94,8 @@ func checkDomainsProtocols(domains []string, workers int, cfg *config.Config) []
 
 	var wg sync.WaitGroup
 
+	bar := progressbar.Default(int64(len(domains)), "Checking protocols")
+
 	for i := 0; i < workers; i++ {
 		wg.Add(1)
 		go func() {
@@ -107,6 +105,7 @@ func checkDomainsProtocols(domains []string, workers int, cfg *config.Config) []
 				if !blacklisted {
 					resultsChan <- domainProtocol{domain: domain, protocol: protocol}
 				}
+				bar.Add(1)
 			}
 		}()
 	}
@@ -144,7 +143,15 @@ func GetDomains(domainsFile, singleDomain string) []string {
 }
 
 func GenerateURLs(domains, paths []string, cfg *config.Config) ([]string, int) {
-	domainProtocols := checkDomainsProtocols(domains, 25, cfg)
+	var domainProtocols []domainProtocol
+
+	if cfg.PerformProtocolCheck {
+		domainProtocols = checkDomainsProtocols(domains, 100, cfg)
+	} else {
+		for _, d := range domains {
+			domainProtocols = append(domainProtocols, domainProtocol{domain: d, protocol: "https"})
+		}
+	}
 
 	var allURLs []string
 	for _, dp := range domainProtocols {
