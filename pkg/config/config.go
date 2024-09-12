@@ -10,7 +10,6 @@ import (
 	"time"
 )
 
-// Config holds all configuration options
 type Config struct {
 	DomainsFile    string
 	Domain         string
@@ -28,10 +27,9 @@ type Config struct {
 	BasePaths      []string
 }
 
-// ParseFlags parses command line flags and returns a Config struct
 func ParseFlags() Config {
 	cfg := Config{
-		ExtraHeaders: make(map[string]string), // Initialize the map here
+		ExtraHeaders: make(map[string]string),
 	}
 	flag.StringVar(&cfg.DomainsFile, "domains", "", "File containing list of domains")
 	flag.StringVar(&cfg.Domain, "domain", "", "Single domain to scan")

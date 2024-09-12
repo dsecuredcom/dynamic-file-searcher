@@ -81,7 +81,6 @@ func (c *Client) MakeRequest(url string) result.Result {
 	}
 	buffer = buffer[:n]
 
-	// Continue reading the rest of the body to get the full size
 	remainingSize, err := io.Copy(io.Discard, resp.Body)
 	if err != nil {
 		return result.Result{URL: url, Error: fmt.Errorf("error reading remaining body: %w", err)}
@@ -102,10 +101,9 @@ func randomizeRequest(req *http.Request) {
 	req.Header.Set("User-Agent", getRandomUserAgent())
 	req.Header.Set("Accept-Language", getRandomAcceptLanguage())
 
-	referer := getRandomReferer(req.URL.String())
-	if referer != "" {
-		req.Header.Set("Referer", referer)
-	}
+	referer := getReferer(req.URL.String())
+	req.Header.Set("Referer", referer)
+	req.Header.Set("Origin", referer)
 
 	if rand.Float32() < 0.5 {
 		req.Header.Set("DNT", "1")
@@ -140,10 +138,6 @@ func getRandomAcceptLanguage() string {
 	return acceptLanguages[rand.Intn(len(acceptLanguages))]
 }
 
-func getRandomReferer(url string) string {
-	parts := strings.Split(url, "/")
-	if len(parts) > 3 {
-		return strings.Join(parts[:3], "/") + "/"
-	}
-	return ""
+func getReferer(url string) string {
+	return url
 }

@@ -3,10 +3,10 @@ package utils
 import (
 	"bufio"
 	"log"
+	"math/rand"
 	"os"
 )
 
-// ReadLines reads a file and returns its contents as a slice of strings
 func ReadLines(filename string) []string {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -25,4 +25,11 @@ func ReadLines(filename string) []string {
 	}
 
 	return lines
+}
+
+func ShuffleStrings(slice []string) {
+	for i := len(slice) - 1; i > 0; i-- {
+		j := rand.Intn(i + 1)
+		slice[i], slice[j] = slice[j], slice[i]
+	}
 }

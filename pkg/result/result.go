@@ -7,7 +7,6 @@ import (
 	"strings"
 )
 
-// Result represents the result of a single request
 type Result struct {
 	URL         string
 	Content     string
@@ -17,7 +16,6 @@ type Result struct {
 	ContentType string
 }
 
-// ProcessResult processes a single Result
 func ProcessResult(result Result, cfg config.Config, markers []string) {
 	if result.Error != nil {
 		if cfg.Verbose {
@@ -26,7 +24,6 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		return
 	}
 
-	// Check HTTP status code
 	if result.StatusCode != cfg.HTTPStatusCode {
 		if cfg.Verbose {
 			log.Printf("Skipping %s: Status code %d (expected %d)\n", result.URL, result.StatusCode, cfg.HTTPStatusCode)
@@ -34,9 +31,6 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		return
 	}
 
-	// Check file size
-
-	// Check for markers in the partial content
 	markerFound := false
 	for _, marker := range markers {
 		if strings.Contains(result.Content, marker) {

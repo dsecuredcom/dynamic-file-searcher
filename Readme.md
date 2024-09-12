@@ -43,6 +43,7 @@ If you add base-paths like "..;/" to the mix, the tool will generate even more p
 - Partial content scanning for efficient marker detection in large files
 - HTTP status code filtering for focused results
 - Custom HTTP header support for advanced probing
+- Skipping certain domains when WAF is detected
 - Proxy support for anonymous scanning
 - Verbose mode for detailed output and analysis
 
@@ -50,7 +51,7 @@ If you add base-paths like "..;/" to the mix, the tool will generate even more p
 
 ### Prerequisites
 
-- Go 1.22 or higher
+- Go 1.19 or higher
 
 ### Compilation
 
