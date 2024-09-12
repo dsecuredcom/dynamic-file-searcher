@@ -44,7 +44,7 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		return
 	}
 
-	if result.FileSize >= cfg.MinFileSize {
+	if cfg.MinFileSize > 0 && result.FileSize >= cfg.MinFileSize {
 		fmt.Printf("\nFound large file (%d bytes, type: %s) at %s\n", result.FileSize, result.ContentType, result.URL)
 		return
 	}

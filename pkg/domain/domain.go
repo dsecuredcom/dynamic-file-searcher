@@ -33,7 +33,7 @@ func isBlacklisted(content string) bool {
 	return false
 }
 
-func checkDomainProtocol(domain string) (string, bool) {
+func checkDomainProtocol(domain string, cfg *config.Config) (string, bool) {
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 	}
@@ -45,18 +45,39 @@ func checkDomainProtocol(domain string) (string, bool) {
 		},
 	}
 
-	resp, err := httpClient.Get(fmt.Sprintf("https://%s", domain))
+	makeRequest := func(protocol string) (*http.Response, error) {
+		url := fmt.Sprintf("%s://%s", protocol, domain)
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		// Set hardcoded headers
+		req.Header.Set("Referer", url)
+		req.Header.Set("Origin", url)
+		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
+
+		// Set extra headers from config
+		for key, value := range cfg.ExtraHeaders {
+			req.Header.Set(key, value)
+		}
+
+		return httpClient.Do(req)
+	}
+
+	// Try HTTPS first
+	resp, err := makeRequest("https")
 	if err == nil {
 		defer resp.Body.Close()
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024)) // Read first 1KB
-		//fmt.Printf("%s\n", body)
 		if isBlacklisted(string(body)) {
 			return "", true
 		}
 		return "https", false
 	}
 
-	resp, err = httpClient.Get(fmt.Sprintf("http://%s", domain))
+	// If HTTPS fails, try HTTP
+	resp, err = makeRequest("http")
 	if err == nil {
 		defer resp.Body.Close()
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024)) // Read first 1KB
@@ -66,10 +87,11 @@ func checkDomainProtocol(domain string) (string, bool) {
 		return "http", false
 	}
 
+	// If both fail, default to HTTPS
 	return "https", false
 }
 
-func checkDomainsProtocols(domains []string, workers int) []domainProtocol {
+func checkDomainsProtocols(domains []string, workers int, cfg *config.Config) []domainProtocol {
 	results := make([]domainProtocol, 0, len(domains))
 	jobs := make(chan string, len(domains))
 	resultsChan := make(chan domainProtocol, len(domains))
@@ -81,7 +103,7 @@ func checkDomainsProtocols(domains []string, workers int) []domainProtocol {
 		go func() {
 			defer wg.Done()
 			for domain := range jobs {
-				protocol, blacklisted := checkDomainProtocol(domain)
+				protocol, blacklisted := checkDomainProtocol(domain, cfg)
 				if !blacklisted {
 					resultsChan <- domainProtocol{domain: domain, protocol: protocol}
 				}
@@ -108,13 +130,21 @@ func checkDomainsProtocols(domains []string, workers int) []domainProtocol {
 
 func GetDomains(domainsFile, singleDomain string) []string {
 	if domainsFile != "" {
-		return utils.ReadLines(domainsFile)
+		allLines := utils.ReadLines(domainsFile)
+		var validDomains []string
+		for _, line := range allLines {
+			trimmedLine := strings.TrimSpace(line)
+			if trimmedLine != "" && !strings.HasPrefix(trimmedLine, "#") {
+				validDomains = append(validDomains, trimmedLine)
+			}
+		}
+		return validDomains
 	}
 	return []string{singleDomain}
 }
 
 func GenerateURLs(domains, paths []string, cfg *config.Config) ([]string, int) {
-	domainProtocols := checkDomainsProtocols(domains, 25)
+	domainProtocols := checkDomainsProtocols(domains, 25, cfg)
 
 	var allURLs []string
 	for _, dp := range domainProtocols {
@@ -157,14 +187,12 @@ func splitDomain(domain string) []string {
 	for _, part := range subdomainParts {
 		results[part] = true
 		results[part+"1"] = true
-		results[part+"123"] = true
 	}
 
 	domain = strings.Join(domainParts, ".")
 	results[domain] = true
 	results[domainParts[0]] = true
 	results[domainParts[0]+"1"] = true
-	results[domainParts[0]+"123"] = true
 
 	baseWords := []string{subdomain}
 	baseWords = append(baseWords, subdomainParts...)
@@ -211,7 +239,7 @@ func isEnvironment(s string) bool {
 }
 
 func generateExtendedWords(baseWords []string) []string {
-	suffixes := []string{"qa", "dev", "stage", "prod", "test", "stg", "uat", "admin", "adm", "backup", "bak", "old", "new"}
+	suffixes := []string{"qa", "dev", "stage", "prod", "test", "stg", "uat", "admin"}
 	var extendedWords []string
 	for _, word := range baseWords {
 
