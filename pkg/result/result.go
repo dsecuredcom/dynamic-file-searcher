@@ -24,13 +24,6 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		return
 	}
 
-	if result.StatusCode != cfg.HTTPStatusCode {
-		if cfg.Verbose {
-			log.Printf("Skipping %s: Status code %d (expected %d)\n", result.URL, result.StatusCode, cfg.HTTPStatusCode)
-		}
-		return
-	}
-
 	markerFound := false
 	for _, marker := range markers {
 		if strings.Contains(result.Content, marker) {
@@ -44,9 +37,36 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		return
 	}
 
+	rulesCount := 0
+
+	if cfg.HTTPStatusCode > 0 {
+		rulesCount++
+	}
+
+	if cfg.MinFileSize > 0 {
+		rulesCount++
+	}
+
+	if cfg.ContentType != "" {
+		rulesCount++
+	}
+
+	rulesMatchd := 0
+
+	if result.StatusCode == cfg.HTTPStatusCode {
+		rulesMatchd++
+	}
+
 	if cfg.MinFileSize > 0 && result.FileSize >= cfg.MinFileSize {
-		fmt.Printf("\nFound large file (%d bytes, type: %s) at %s\n", result.FileSize, result.ContentType, result.URL)
-		return
+		rulesMatchd++
+	}
+
+	if cfg.ContentType != "" && strings.Contains(result.ContentType, cfg.ContentType) {
+		rulesMatchd++
+	}
+
+	if rulesMatchd == rulesCount {
+		fmt.Printf("\nFound based on rules: 'S: %d, FS: %d', CT: %s in %s\n", result.StatusCode, result.FileSize, result.ContentType, result.URL)
 	}
 
 	if cfg.Verbose && !markerFound {

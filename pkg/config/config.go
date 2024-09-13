@@ -24,6 +24,7 @@ type Config struct {
 	MinFileSize             int64
 	MaxContentSize          int64
 	HTTPStatusCode          int
+	ContentType             string
 	BasePaths               []string
 	PerformProtocolCheck    bool
 	UseStaticWordSeparator  bool
@@ -46,6 +47,7 @@ func ParseFlags() Config {
 	flag.BoolVar(&cfg.Verbose, "verbose", false, "Verbose output")
 	flag.BoolVar(&cfg.UseStaticWordSeparator, "use-static-separator", false, "Use static word separator")
 	flag.StringVar(&cfg.StaticWordSeparatorFile, "static-separator-file", "", "File containing static words for separation")
+	flag.StringVar(&cfg.ContentType, "content-type", "", "Content-Type header value to filter")
 	flag.Int64Var(&cfg.MinFileSize, "min-size", 0, "Minimum file size to detect (in bytes)")
 	flag.Int64Var(&cfg.MaxContentSize, "max-content-size", 5*1024*1024, "Maximum size of content to read for marker checking (in bytes)")
 	flag.IntVar(&cfg.HTTPStatusCode, "status", 200, "HTTP status code to filter")
