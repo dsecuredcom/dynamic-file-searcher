@@ -102,6 +102,7 @@ or
 - `-headers`: Extra headers to add to each request (format: 'Header1:Value1,Header2:Value2')
 - `-proxy`: Proxy URL (e.g., http://127.0.0.1:8080)
 - `-use-static-separator`: Use static word separator (default: false)
+- `-content-type`: Content type to filter (default: all)
 - `-static-separator-file`: File containing static words for separation (required if `-use-static-separator` is true)
 
 ### Examples
@@ -121,9 +122,9 @@ or
    ./dynamic_file_searcher -domain example.com -paths paths.txt -markers markers.txt -base-paths base_paths.txt
    ```
 
-4. Scan for large files (>50MB) with custom marker checking size:
+4. Scan for large files (>5MB) with content type JSON:
    ```
-   ./dynamic_file_searcher -domains domains.txt -paths paths.txt -markers markers.txt -min-size 52428800 -max-content-size 10485760
+   ./dynamic_file_searcher -domains domains.txt -paths paths.txt -min-size 5000000 -content-type json
    ```
 
 5. Targeted scan through a proxy with custom headers:
@@ -161,6 +162,7 @@ or
    - The response is analyzed based on:
       * Presence of specified content markers in the read portion (if markers are provided)
       * Total file size (compared against `min-size`)
+      * Content type (if specified)
       * HTTP status code
 9. Results are reported in real-time, with a progress bar indicating overall completion.
 
