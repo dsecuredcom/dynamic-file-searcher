@@ -202,6 +202,16 @@ func GenerateURLs(domains, paths []string, cfg *config.Config) ([]string, int) {
 		for _, path := range paths {
 			allURLs = append(allURLs, fmt.Sprintf("%s://%s/%s", dp.protocol, dp.domain, path))
 
+			if len(cfg.BasePaths) > 0 {
+				for _, basePath := range cfg.BasePaths {
+					allURLs = append(allURLs, fmt.Sprintf("%s://%s/%s/%s", dp.protocol, dp.domain, basePath, path))
+				}
+			}
+
+			if cfg.DontGeneratePaths == true {
+				continue
+			}
+
 			words := splitDomain(dp.domain, cfg)
 
 			if len(cfg.BasePaths) == 0 {
@@ -211,7 +221,7 @@ func GenerateURLs(domains, paths []string, cfg *config.Config) ([]string, int) {
 			} else {
 				for _, word := range words {
 					for _, basePath := range cfg.BasePaths {
-						allURLs = append(allURLs, fmt.Sprintf("%s://%s/%s%s/%s", dp.protocol, dp.domain, basePath, word, path))
+						allURLs = append(allURLs, fmt.Sprintf("%s://%s/%s/%s/%s", dp.protocol, dp.domain, basePath, word, path))
 					}
 				}
 			}

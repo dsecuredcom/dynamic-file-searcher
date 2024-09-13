@@ -27,6 +27,7 @@ type Config struct {
 	ContentType             string
 	BasePaths               []string
 	PerformProtocolCheck    bool
+	DontGeneratePaths       bool
 	UseStaticWordSeparator  bool
 	StaticWordSeparatorFile string
 	StaticWords             []string
@@ -43,6 +44,7 @@ func ParseFlags() Config {
 	flag.StringVar(&cfg.BasePathsFile, "base-paths", "", "File containing list of base paths")
 	flag.IntVar(&cfg.Concurrency, "concurrency", 10, "Number of concurrent requests")
 	flag.BoolVar(&cfg.PerformProtocolCheck, "check-protocol", false, "Perform protocol check (determines if HTTP or HTTPS is supported)")
+	flag.BoolVar(&cfg.DontGeneratePaths, "dont-generate-paths", false, "If true, only the base paths (or nothing) will be used for scanning")
 	flag.DurationVar(&cfg.Timeout, "timeout", 12*time.Second, "Timeout for each request")
 	flag.BoolVar(&cfg.Verbose, "verbose", false, "Verbose output")
 	flag.BoolVar(&cfg.UseStaticWordSeparator, "use-static-separator", false, "Use static word separator")

@@ -96,6 +96,7 @@ or
 - `-check-protocol`: Perform protocol check (determines if HTTP or HTTPS is supported) (default: false)
 - `-timeout`: Timeout for each request (default: 12s)
 - `-verbose`: Enable verbose output
+- `-dont-generate-paths`: Don't generate paths based on host structure (default: false)
 - `-min-size`: Minimum file size to detect, in bytes (default: 0)
 - `-max-content-size`: Maximum size of content to read for marker checking, in bytes (default: 5242880)
 - `-status`: HTTP status code to filter (default: 200)
@@ -145,6 +146,11 @@ or
 8. Verbose output with custom timeout:
    ```
    ./dynamic_file_searcher -domain example.com -paths paths.txt -markers markers.txt -verbose -timeout 30s
+   ```
+
+9. Scan only root paths without generating additional paths:
+   ```
+   ./dynamic_file_searcher -domain example.com -paths paths.txt -markers markers.txt -dont-generate-paths
    ```
 
 ## How It Works

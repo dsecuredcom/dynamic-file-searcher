@@ -1,8 +1,8 @@
 package result
 
 import (
-	"fmt"
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/config"
+	"github.com/fatih/color"
 	"log"
 	"strings"
 )
@@ -27,7 +27,8 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 	markerFound := false
 	for _, marker := range markers {
 		if strings.Contains(result.Content, marker) {
-			fmt.Printf("\nFound marker '%s' in %s\n", marker, result.URL)
+			color.Green("\n[!]\tFound marker '%s' in %s", marker, result.URL)
+			color.Green("\n[!]\tBody: %s\n", result.Content[:150])
 			markerFound = true
 			break
 		}
@@ -66,7 +67,8 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 	}
 
 	if rulesMatchd == rulesCount {
-		fmt.Printf("\nFound based on rules: 'S: %d, FS: %d', CT: %s in %s\n", result.StatusCode, result.FileSize, result.ContentType, result.URL)
+		color.Green("\n[!]\tFound based on rules: 'S: %d, FS: %d', CT: %s in %s", result.StatusCode, result.FileSize, result.ContentType, result.URL)
+		color.Green("\n[!]\tBody: %s\n", result.Content[:150])
 	}
 
 	if cfg.Verbose && !markerFound {
