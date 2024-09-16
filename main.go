@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"math/rand"
 	"os"
 	"sync"
+	"syscall"
 	"time"
 
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/config"
@@ -88,8 +90,8 @@ func main() {
 		}
 	}
 
-	//fmt.Printf("%s", allURLs)
-	//syscall.Exit(1)
+	fmt.Printf("%s", allURLs)
+	syscall.Exit(1)
 
 	results := make(chan result.Result)
 

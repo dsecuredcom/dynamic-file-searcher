@@ -33,6 +33,9 @@ var (
 	envRegex          = regexp.MustCompile(`prod|qa|dev|stage|test|uat|stg|stg`)
 	numberSuffixRegex = regexp.MustCompile(`\d+$`)
 	envWords          = []string{"-prod", "-qa", "-dev", "-stage", "-test", "-uat", "-stg", "qa", "dev", "test", "-v1", "-v2", "1"}
+	regionPartRegex   = regexp.MustCompile(`(us-east-1|us-east-2|us-west-1|us-west-2|af-south-1|ap-east-1|ap-south-1|ap-northeast-3|ap-northeast-2|ap-southeast-1|ap-southeast-2|ap-northeast-1|ca-central-1|eu-central-1|eu-west-1|eu-west-2|eu-west-3|eu-north-1|eu-south-1|me-south-1|sa-east-1)`)
+	singleDigitRegex  = regexp.MustCompile(`^(\d{1})$`)
+	singleCharRegex   = regexp.MustCompile(`^([a-z]{1,1})$`)
 )
 
 var commonTLDs = []string{
@@ -246,14 +249,35 @@ func splitDomain(host string, cfg *config.Config) []string {
 
 	parts := strings.Split(host, ".")
 
+	var RelevantPaths []string
+	cutset := "._-"
+	for _, part := range parts {
+
+		if singleDigitRegex.MatchString(part) {
+			continue
+		}
+
+		if singleCharRegex.MatchString(part) {
+			continue
+		}
+
+		part = regionPartRegex.ReplaceAllString(part, "")
+
+		part = strings.TrimRight(strings.TrimLeft(part, cutset), cutset)
+		RelevantPaths = append(RelevantPaths, part)
+	}
+
+	//fmt.Println(RelevantPaths)
+	//syscall.Exit(1)
+
 	// Limit to host-depth, take the first X parts
-	if cfg.HostDepth > 0 && len(parts) > cfg.HostDepth {
-		parts = parts[:cfg.HostDepth]
+	if cfg.HostDepth > 0 && len(RelevantPaths) > cfg.HostDepth {
+		RelevantPaths = RelevantPaths[:cfg.HostDepth]
 	}
 
 	var words []string
 
-	for _, part := range parts {
+	for _, part := range RelevantPaths {
 		words = CombineUniqueStringSlices(words, extractWords(part))
 
 		if cfg.UseStaticWordSeparator && len(cfg.StaticWords) > 0 && onlyAlphaRegex.MatchString(part) {
