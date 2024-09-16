@@ -8,6 +8,7 @@ import (
 
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/config"
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/domain"
+	"github.com/dsecuredcom/dynamic-file-searcher/pkg/fasthttp"
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/http"
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/result"
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/utils"
@@ -97,11 +98,19 @@ func main() {
 	var wg sync.WaitGroup
 	urlChan := make(chan string, cfg.Concurrency)
 
-	client := http.NewClient(cfg)
-
-	for i := 0; i < cfg.Concurrency; i++ {
-		wg.Add(1)
-		go worker(urlChan, results, &wg, cfg, bar, client, markers)
+	//@todo bad code, refactor when time!!!
+	if cfg.FastHTTP {
+		client := fasthttp.NewClient(cfg)
+		for i := 0; i < cfg.Concurrency; i++ {
+			wg.Add(1)
+			go workerFast(urlChan, results, &wg, cfg, bar, client, markers)
+		}
+	} else {
+		client := http.NewClient(cfg)
+		for i := 0; i < cfg.Concurrency; i++ {
+			wg.Add(1)
+			go workerDefault(urlChan, results, &wg, cfg, bar, client, markers)
+		}
 	}
 
 	go func() {
@@ -123,7 +132,17 @@ func main() {
 	color.Green("\n[✔] Scan completed.")
 }
 
-func worker(urls <-chan string, results chan<- result.Result, wg *sync.WaitGroup, cfg config.Config, bar *progressbar.ProgressBar, client *http.Client, markers []string) {
+func workerDefault(urls <-chan string, results chan<- result.Result, wg *sync.WaitGroup, cfg config.Config, bar *progressbar.ProgressBar, client *http.Client, markers []string) {
+	defer wg.Done()
+
+	for url := range urls {
+		res := client.MakeRequest(url)
+		bar.Add(1)
+		results <- res
+	}
+}
+
+func workerFast(urls <-chan string, results chan<- result.Result, wg *sync.WaitGroup, cfg config.Config, bar *progressbar.ProgressBar, client *fasthttp.Client, markers []string) {
 	defer wg.Done()
 
 	for url := range urls {

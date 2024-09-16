@@ -17,6 +17,7 @@ type Config struct {
 	MarkersFile             string
 	BasePathsFile           string
 	Concurrency             int
+	HostDepth               int
 	Timeout                 time.Duration
 	Verbose                 bool
 	ProxyURL                *url.URL
@@ -31,6 +32,7 @@ type Config struct {
 	UseStaticWordSeparator  bool
 	StaticWordSeparatorFile string
 	StaticWords             []string
+	FastHTTP                bool
 }
 
 func ParseFlags() Config {
@@ -43,10 +45,12 @@ func ParseFlags() Config {
 	flag.StringVar(&cfg.MarkersFile, "markers", "", "File containing list of markers")
 	flag.StringVar(&cfg.BasePathsFile, "base-paths", "", "File containing list of base paths")
 	flag.IntVar(&cfg.Concurrency, "concurrency", 10, "Number of concurrent requests")
+	flag.IntVar(&cfg.HostDepth, "host-depth", 6, "How many sub-subdomains to use for path generation (e.g., 2 = test1-abc & test2 [based on test1-abc.test2.test3.example.com])")
 	flag.BoolVar(&cfg.PerformProtocolCheck, "check-protocol", false, "Perform protocol check (determines if HTTP or HTTPS is supported)")
 	flag.BoolVar(&cfg.DontGeneratePaths, "dont-generate-paths", false, "If true, only the base paths (or nothing) will be used for scanning")
 	flag.DurationVar(&cfg.Timeout, "timeout", 12*time.Second, "Timeout for each request")
 	flag.BoolVar(&cfg.Verbose, "verbose", false, "Verbose output")
+	flag.BoolVar(&cfg.FastHTTP, "use-fasthttp", false, "Use fasthttp instead of net/http")
 	flag.BoolVar(&cfg.UseStaticWordSeparator, "use-static-separator", false, "Use static word separator")
 	flag.StringVar(&cfg.StaticWordSeparatorFile, "static-separator-file", "", "File containing static words for separation")
 	flag.StringVar(&cfg.ContentType, "content-type", "", "Content-Type header value to filter")

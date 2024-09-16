@@ -246,14 +246,14 @@ func splitDomain(host string, cfg *config.Config) []string {
 
 	parts := strings.Split(host, ".")
 
-	var words []string
-
-	relevantParts := parts
-	if len(parts) > 3 {
-		relevantParts = parts[:3]
+	// Limit to host-depth, take the first X parts
+	if cfg.HostDepth > 0 && len(parts) > cfg.HostDepth {
+		parts = parts[:cfg.HostDepth]
 	}
 
-	for _, part := range relevantParts {
+	var words []string
+
+	for _, part := range parts {
 		words = CombineUniqueStringSlices(words, extractWords(part))
 
 		if cfg.UseStaticWordSeparator && len(cfg.StaticWords) > 0 && onlyAlphaRegex.MatchString(part) {

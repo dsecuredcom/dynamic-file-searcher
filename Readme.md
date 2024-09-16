@@ -93,6 +93,8 @@ or
 - `-markers`: File containing a list of content markers to search for (optional)
 - `-base-paths`: File containing list of base paths for additional URL generation (optional) (e.g., "..;/" - it should be one per line and end with "/")
 - `-concurrency`: Number of concurrent requests (default: 10)
+- `-use-fasthttp`: Use fasthttp instead of net/http (default: false)
+- `-host-depth`: How many sub-subdomains to use for path generation (e.g., 2 = test1-abc & test2 [based on test1-abc.test2.test3.example.com])
 - `-check-protocol`: Perform protocol check (determines if HTTP or HTTPS is supported) (default: false)
 - `-timeout`: Timeout for each request (default: 12s)
 - `-verbose`: Enable verbose output
