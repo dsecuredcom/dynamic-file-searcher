@@ -62,6 +62,9 @@ func (c *Client) MakeRequest(url string) result.Result {
 	client := &fasthttp.Client{
 		ReadTimeout:  c.config.Timeout,
 		WriteTimeout: c.config.Timeout,
+		TLSConfig: &tls.Config{
+			InsecureSkipVerify: true,
+		},
 	}
 
 	err := client.DoTimeout(req, resp, c.config.Timeout)
