@@ -278,7 +278,7 @@ func splitDomain(host string, cfg *config.Config) []string {
 	var words []string
 
 	for _, part := range RelevantPaths {
-		words = CombineUniqueStringSlices(words, extractWords(part))
+		words = CombineUniqueStringSlices(words, extractWords(part, cfg))
 
 		if cfg.UseStaticWordSeparator && len(cfg.StaticWords) > 0 && onlyAlphaRegex.MatchString(part) {
 			for _, staticword := range cfg.StaticWords {
@@ -296,7 +296,7 @@ func splitDomain(host string, cfg *config.Config) []string {
 	return filteredWords
 }
 
-func extractWords(part string) []string {
+func extractWords(part string, cfg *config.Config) []string {
 	subparts := regexp.MustCompile(`[._-]`).Split(part, -1)
 
 	words := make(map[string]bool)
@@ -312,18 +312,21 @@ func extractWords(part string) []string {
 
 	}
 
-	for subpart, _ := range words {
-		if onlyAlphaRegex.MatchString(subpart) {
+	if cfg.DontGeneratePaths == true {
+		for subpart, _ := range words {
+			if onlyAlphaRegex.MatchString(subpart) {
 
-			if envRegex.MatchString(subpart) {
-				continue
-			}
-			for _, word := range envWords {
-				if strings.Contains(subpart, word) {
-					break
+				if envRegex.MatchString(subpart) {
+					continue
 				}
 
-				words[subpart+word] = true
+				for _, word := range envWords {
+					if strings.Contains(subpart, word) {
+						break
+					}
+
+					words[subpart+word] = true
+				}
 			}
 		}
 	}

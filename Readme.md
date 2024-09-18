@@ -99,6 +99,7 @@ or
 - `-timeout`: Timeout for each request (default: 12s)
 - `-verbose`: Enable verbose output
 - `-dont-generate-paths`: Don't generate paths based on host structure (default: false)
+- `-dont-append-envs`: Prevent appending environment variables to requests (-qa, ...) (default: false)
 - `-min-size`: Minimum file size to detect, in bytes (default: 0)
 - `-max-content-size`: Maximum size of content to read for marker checking, in bytes (default: 5242880)
 - `-status`: HTTP status code to filter (default: 200)

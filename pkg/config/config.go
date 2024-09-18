@@ -33,6 +33,7 @@ type Config struct {
 	StaticWordSeparatorFile string
 	StaticWords             []string
 	FastHTTP                bool
+	NoEnvAppending          bool
 }
 
 func ParseFlags() Config {
@@ -51,6 +52,7 @@ func ParseFlags() Config {
 	flag.DurationVar(&cfg.Timeout, "timeout", 12*time.Second, "Timeout for each request")
 	flag.BoolVar(&cfg.Verbose, "verbose", false, "Verbose output")
 	flag.BoolVar(&cfg.FastHTTP, "use-fasthttp", false, "Use fasthttp instead of net/http")
+	flag.BoolVar(&cfg.NoEnvAppending, "dont-append-envs", false, "Prevent appending environment variables to requests (-qa, ...)")
 	flag.BoolVar(&cfg.UseStaticWordSeparator, "use-static-separator", false, "Use static word separator")
 	flag.StringVar(&cfg.StaticWordSeparatorFile, "static-separator-file", "", "File containing static words for separation")
 	flag.StringVar(&cfg.ContentType, "content-type", "", "Content-Type header value to filter")
