@@ -1,6 +1,7 @@
 package fasthttp
 
 import (
+	"crypto/tls"
 	"fmt"
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/config"
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/result"
@@ -34,6 +35,9 @@ func NewClient(cfg config.Config) *Client {
 			ReadTimeout:                   cfg.Timeout,
 			WriteTimeout:                  cfg.Timeout,
 			DisableHeaderNamesNormalizing: true, // Prevent automatic header modifications
+			TLSConfig: &tls.Config{
+				InsecureSkipVerify: true,
+			},
 		},
 	}
 }
