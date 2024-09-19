@@ -27,7 +27,7 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 	markerFound := false
 	for _, marker := range markers {
 		if strings.Contains(result.Content, marker) {
-			color.Green("\n[!]\tFound marker '%s' in %s", marker, result.URL)
+			color.Red("\n[!]\tFound marker '%s' in %s", marker, result.URL)
 			if len(result.Content) > 150 {
 				color.Green("\n[!]\tBody: %s\n", result.Content[:150])
 			} else {
@@ -71,7 +71,7 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 	}
 
 	if rulesMatchd == rulesCount {
-		color.Green("\n[!]\tFound based on rules: 'S: %d, FS: %d', CT: %s in %s", result.StatusCode, result.FileSize, result.ContentType, result.URL)
+		color.Red("\n[!]\tFound based on rules: 'S: %d, FS: %d', CT: %s in %s", result.StatusCode, result.FileSize, result.ContentType, result.URL)
 		if len(result.Content) > 150 {
 			color.Green("\n[!]\tBody: %s\n", result.Content[:150])
 		} else {
