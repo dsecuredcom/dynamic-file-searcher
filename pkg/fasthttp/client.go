@@ -68,7 +68,11 @@ func (c *Client) MakeRequest(url string) result.Result {
 		},
 	}
 
-	err := client.DoTimeout(req, resp, c.config.Timeout)
+	err := client.DoRedirects(req, resp, 0)
+	if err == fasthttp.ErrMissingLocation {
+		return result.Result{URL: url, Error: fmt.Errorf("error fetching: %w", err)}
+	}
+
 	if err != nil {
 		if c.config.ShowFetchTimeoutErrors && err == fasthttp.ErrTimeout {
 			color.Red("\n[!]\tTimeout based detection: 'Url: %s Error: %s", url, err)

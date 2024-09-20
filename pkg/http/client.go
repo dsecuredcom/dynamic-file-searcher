@@ -48,6 +48,9 @@ func NewClient(cfg config.Config) *Client {
 	client := &http.Client{
 		Transport: transport,
 		Timeout:   cfg.Timeout + 3*time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 	}
 
 	return &Client{
