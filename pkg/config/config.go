@@ -57,7 +57,7 @@ func ParseFlags() Config {
 	flag.BoolVar(&cfg.UseStaticWordSeparator, "use-static-separator", false, "Use static word separator")
 	flag.BoolVar(&cfg.ShowFetchTimeoutErrors, "show-fetch-timeout-errors", false, "Shows fetch timeout errors - this is useful when scanning for large files.")
 	flag.StringVar(&cfg.StaticWordSeparatorFile, "static-separator-file", "", "File containing static words for separation")
-	flag.StringVar(&cfg.ContentType, "content-type", "", "Content-Type header value to filter")
+	flag.StringVar(&cfg.ContentType, "content-type", "", "Content-Type header value to filter (csv allowed, e.g. json,octet)")
 	flag.Int64Var(&cfg.MinFileSize, "min-size", 0, "Minimum file size to detect (in bytes)")
 	flag.Int64Var(&cfg.MaxContentSize, "max-content-size", 5*1024*1024, "Maximum size of content to read for marker checking (in bytes)")
 	flag.IntVar(&cfg.HTTPStatusCode, "status", 200, "HTTP status code to filter")

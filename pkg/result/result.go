@@ -66,8 +66,14 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		rulesMatchd++
 	}
 
-	if cfg.ContentType != "" && strings.Contains(result.ContentType, cfg.ContentType) {
-		rulesMatchd++
+	if cfg.ContentType != "" {
+		contentTypes := strings.Split(cfg.ContentType, ",")
+		for _, contentType := range contentTypes {
+			if strings.Contains(result.ContentType, contentType) {
+				rulesMatchd++
+				break
+			}
+		}
 	}
 
 	if rulesMatchd == rulesCount {

@@ -73,7 +73,7 @@ func (c *Client) MakeRequest(url string) result.Result {
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		if c.config.ShowFetchTimeoutErrors {
+		if c.config.ShowFetchTimeoutErrors && strings.Contains(err.Error(), "context deadline exceeded") {
 			color.Red("\n[!]\tTimeout based detection: 'Url: %s Error: %s", url, err)
 		}
 		return result.Result{URL: url, Error: fmt.Errorf("error fetching: %w", err)}
