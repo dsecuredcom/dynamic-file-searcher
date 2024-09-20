@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"github.com/fatih/color"
 	"io"
 	"math/rand"
 	"net/http"
@@ -72,6 +73,9 @@ func (c *Client) MakeRequest(url string) result.Result {
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		if c.config.ShowFetchTimeoutErrors {
+			color.Red("\n[!]\tTimeout based detection: 'Url: %s Error: %s", url, err)
+		}
 		return result.Result{URL: url, Error: fmt.Errorf("error fetching: %w", err)}
 	}
 	defer resp.Body.Close()

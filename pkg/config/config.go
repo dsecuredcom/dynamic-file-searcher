@@ -34,6 +34,7 @@ type Config struct {
 	StaticWords             []string
 	FastHTTP                bool
 	NoEnvAppending          bool
+	ShowFetchTimeoutErrors  bool
 }
 
 func ParseFlags() Config {
@@ -54,6 +55,7 @@ func ParseFlags() Config {
 	flag.BoolVar(&cfg.FastHTTP, "use-fasthttp", false, "Use fasthttp instead of net/http")
 	flag.BoolVar(&cfg.NoEnvAppending, "dont-append-envs", false, "Prevent appending environment variables to requests (-qa, ...)")
 	flag.BoolVar(&cfg.UseStaticWordSeparator, "use-static-separator", false, "Use static word separator")
+	flag.BoolVar(&cfg.ShowFetchTimeoutErrors, "show-fetch-timeout-errors", false, "Shows fetch timeout errors - this is useful when scanning for large files.")
 	flag.StringVar(&cfg.StaticWordSeparatorFile, "static-separator-file", "", "File containing static words for separation")
 	flag.StringVar(&cfg.ContentType, "content-type", "", "Content-Type header value to filter")
 	flag.Int64Var(&cfg.MinFileSize, "min-size", 0, "Minimum file size to detect (in bytes)")
