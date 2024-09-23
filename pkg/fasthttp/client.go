@@ -104,6 +104,7 @@ func randomizeRequest(req *fasthttp.Request) {
 	referer := getReferer(req.URI().String())
 	req.Header.Set("Referer", referer)
 	req.Header.Set("Origin", referer)
+	req.Header.Set("Accept", "*/*")
 
 	if rand.Float32() < 0.5 {
 		req.Header.Set("DNT", "1")
