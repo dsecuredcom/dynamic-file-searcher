@@ -36,6 +36,7 @@ type Config struct {
 	FastHTTP                bool
 	NoEnvAppending          bool
 	ShowFetchTimeoutErrors  bool
+	ForceHTTPProt           bool
 }
 
 func ParseFlags() Config {
@@ -54,6 +55,7 @@ func ParseFlags() Config {
 	flag.DurationVar(&cfg.Timeout, "timeout", 12*time.Second, "Timeout for each request")
 	flag.BoolVar(&cfg.Verbose, "verbose", false, "Verbose output")
 	flag.BoolVar(&cfg.FastHTTP, "use-fasthttp", false, "Use fasthttp instead of net/http")
+	flag.BoolVar(&cfg.ForceHTTPProt, "force-http", false, "Force the usage of http:// instead of https://")
 	flag.BoolVar(&cfg.DontPrependSlash, "dont-prepend-slash", false, "Don't prepend slash to paths - watch out and read code when used with base paths")
 	flag.BoolVar(&cfg.NoEnvAppending, "dont-append-envs", false, "Prevent appending environment variables to requests (-qa, ...)")
 	flag.BoolVar(&cfg.UseStaticWordSeparator, "use-static-separator", false, "Use static word separator")

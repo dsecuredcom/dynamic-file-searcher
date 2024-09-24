@@ -195,8 +195,12 @@ func GenerateURLs(domains, paths []string, cfg *config.Config) ([]string, int) {
 	if cfg.PerformProtocolCheck {
 		domainProtocols = checkDomainsProtocols(domains, 100, cfg)
 	} else {
+		var proto = "https"
+		if cfg.ForceHTTPProt {
+			proto = "http"
+		}
 		for _, d := range domains {
-			domainProtocols = append(domainProtocols, domainProtocol{domain: d, protocol: "https"})
+			domainProtocols = append(domainProtocols, domainProtocol{domain: d, protocol: proto})
 		}
 	}
 
