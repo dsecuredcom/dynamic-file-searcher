@@ -213,6 +213,11 @@ func GenerateURLs(domains, paths []string, cfg *config.Config) ([]string, int) {
 	}
 	for _, dp := range domainProtocols {
 		for _, path := range paths {
+
+			if strings.HasPrefix(path, "##") {
+				continue
+			}
+
 			allURLs = append(allURLs, fmt.Sprintf("%s://%s/%s%s", dp.protocol, dp.domain, "", path))
 
 			if len(cfg.BasePaths) > 0 {
