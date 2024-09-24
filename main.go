@@ -141,24 +141,40 @@ func worker(urls <-chan string, results chan<- result.Result, wg *sync.WaitGroup
 
 func trackProgress(processedCount, totalURLs *int64, done chan bool) {
 	start := time.Now()
+	lastProcessed := int64(0)
+	lastUpdate := start
+
 	for {
 		select {
 		case <-done:
 			return
 		default:
-			processed := atomic.LoadInt64(processedCount)
+			now := time.Now()
+			elapsed := now.Sub(start)
+			currentProcessed := atomic.LoadInt64(processedCount)
 			total := atomic.LoadInt64(totalURLs)
+
+			// Calculate RPS
+			intervalElapsed := now.Sub(lastUpdate)
+			intervalProcessed := currentProcessed - lastProcessed
+			rps := float64(intervalProcessed) / intervalElapsed.Seconds()
+
 			if total > 0 {
-				percentage := float64(processed) / float64(total) * 100
-				elapsed := time.Since(start)
-				estimatedTotal := float64(elapsed) / (float64(processed) / float64(total))
+				percentage := float64(currentProcessed) / float64(total) * 100
+				estimatedTotal := float64(elapsed) / (float64(currentProcessed) / float64(total))
 				remainingTime := time.Duration(estimatedTotal - float64(elapsed))
 
-				fmt.Printf("\rProgress: %.2f%% (%d/%d) | Elapsed: %s | ETA: %s",
-					percentage, processed, total, elapsed.Round(time.Second), remainingTime.Round(time.Second))
+				fmt.Printf("\rProgress: %.2f%% (%d/%d) | RPS: %.2f | Elapsed: %s | ETA: %s",
+					percentage, currentProcessed, total, rps,
+					elapsed.Round(time.Second), remainingTime.Round(time.Second))
 			} else {
-				fmt.Printf("\rProcessed: %d | Elapsed: %s", processed, time.Since(start).Round(time.Second))
+				fmt.Printf("\rProcessed: %d | RPS: %.2f | Elapsed: %s",
+					currentProcessed, rps, elapsed.Round(time.Second))
 			}
+
+			lastProcessed = currentProcessed
+			lastUpdate = now
+
 			time.Sleep(time.Second)
 		}
 	}
