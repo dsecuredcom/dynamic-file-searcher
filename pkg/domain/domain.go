@@ -36,6 +36,7 @@ var (
 	regionPartRegex   = regexp.MustCompile(`(us-east-1|us-east-2|us-west-1|us-west-2|af-south-1|ap-east-1|ap-south-1|ap-northeast-3|ap-northeast-2|ap-southeast-1|ap-southeast-2|ap-southeast-3|ap-northeast-1|ca-central-1|eu-central-1|eu-west-1|eu-west-2|eu-west-3|eu-north-1|eu-south-1|me-south-1|sa-east-1|useast1|useast2|uswest1|uswest2|afsouth1|apeast1|apsouth1|apnortheast3|apnortheast2|apsoutheast1|apsoutheast2|apsoutheast3|apnortheast1|cacentral1|eucentral1|euwest1|euwest2|euwest3|eunorth1|eusouth1|mesouth1|saeast1)`)
 	singleDigitRegex  = regexp.MustCompile(`^(\d{1})$`)
 	singleCharRegex   = regexp.MustCompile(`^([a-z]{1,1})$`)
+	byPassCharacters  = []string{";", "..;"}
 )
 
 var commonTLDs = []string{
@@ -308,7 +309,23 @@ func splitDomain(host string, cfg *config.Config) []string {
 
 	filteredWords := filterWords(words)
 
+	if cfg.AppendByPassesToWords {
+		filteredWords = CombineUniqueStringSlices(filteredWords, createBypassedWords(filteredWords))
+	}
+
 	return filteredWords
+}
+
+func createBypassedWords(words []string) []string {
+	newWords := make([]string, 0)
+
+	for _, word := range words {
+		for _, bypass := range byPassCharacters {
+			newWords = append(newWords, fmt.Sprintf("%s%s", word, bypass))
+		}
+	}
+
+	return newWords
 }
 
 func extractWords(part string, cfg *config.Config) []string {
@@ -327,7 +344,7 @@ func extractWords(part string, cfg *config.Config) []string {
 
 	}
 
-	if cfg.DontGeneratePaths == false {
+	if cfg.NoEnvAppending == false {
 		for subpart, _ := range words {
 			if onlyAlphaRegex.MatchString(subpart) {
 
