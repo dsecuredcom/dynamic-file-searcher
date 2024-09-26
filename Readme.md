@@ -1,11 +1,5 @@
 # Dynamic File Searcher
 
-<p align="center">
-  <a href="https://www.dsecured.com">
-    <img width="460" src="https://www.dsecured.com/images/users/presse/presse-dsecured-logo-bg-lila.jpeg">
-  </a>
-</p>
-
 ## Overview
 
 Dynamic File Searcher is an advanced, Go-based CLI tool designed for intelligent and deep web crawling. Its unique
