@@ -33,7 +33,7 @@ var (
 	envRegex          = regexp.MustCompile(`prod|qa|dev|stage|test|uat|stg|stg`)
 	numberSuffixRegex = regexp.MustCompile(`\d+$`)
 	envWords          = []string{"-prod", "-qa", "-dev", "-stage", "-test", "-uat", "-stg", "qa", "dev", "test", "-v1", "-v2", "1"}
-	regionPartRegex   = regexp.MustCompile(`(us-east-1|us-east-2|us-west-1|us-west-2|af-south-1|ap-east-1|ap-south-1|ap-northeast-3|ap-northeast-2|ap-southeast-1|ap-southeast-2|ap-northeast-1|ca-central-1|eu-central-1|eu-west-1|eu-west-2|eu-west-3|eu-north-1|eu-south-1|me-south-1|sa-east-1)`)
+	regionPartRegex   = regexp.MustCompile(`(us-east-1|us-east-2|us-west-1|us-west-2|af-south-1|ap-east-1|ap-south-1|ap-northeast-3|ap-northeast-2|ap-southeast-1|ap-southeast-2|ap-southeast-3|ap-northeast-1|ca-central-1|eu-central-1|eu-west-1|eu-west-2|eu-west-3|eu-north-1|eu-south-1|me-south-1|sa-east-1|useast1|useast2|uswest1|uswest2|afsouth1|apeast1|apsouth1|apnortheast3|apnortheast2|apsoutheast1|apsoutheast2|apsoutheast3|apnortheast1|cacentral1|eucentral1|euwest1|euwest2|euwest3|eunorth1|eusouth1|mesouth1|saeast1)`)
 	singleDigitRegex  = regexp.MustCompile(`^(\d{1})$`)
 	singleCharRegex   = regexp.MustCompile(`^([a-z]{1,1})$`)
 )
