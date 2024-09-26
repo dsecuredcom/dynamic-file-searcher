@@ -1,12 +1,15 @@
 # Dynamic File Searcher
 
-
 <p align="center">
-  <img width="460" src="https://www.dsecured.com/images/users/presse/presse-dsecured-logo-bg-lila.jpeg">
+  <a href="https://www.dsecured.com">
+    <img width="460" src="https://www.dsecured.com/images/users/presse/presse-dsecured-logo-bg-lila.jpeg">
+  </a>
 </p>
 ## Overview
 
-Dynamic File Searcher is an advanced, Go-based CLI tool designed for intelligent and deep web crawling. Its unique strength lies in its ability to dynamically generate and explore paths based on the target hosts, allowing for much deeper and more comprehensive scans than traditional tools.
+Dynamic File Searcher is an advanced, Go-based CLI tool designed for intelligent and deep web crawling. Its unique
+strength lies in its ability to dynamically generate and explore paths based on the target hosts, allowing for much
+deeper and more comprehensive scans than traditional tools.
 
 ### Key Differentiators
 
@@ -14,7 +17,8 @@ Dynamic File Searcher is an advanced, Go-based CLI tool designed for intelligent
 - Optional base paths for advanced URL generation
 - Flexible word separation options for more targeted searches
 
-While powerful alternatives like nuclei exist, Dynamic File Searcher offers easier handling and more flexibility in path generation compared to static, template-based approaches.
+While powerful alternatives like nuclei exist, Dynamic File Searcher offers easier handling and more flexibility in path
+generation compared to static, template-based approaches.
 
 ### Examples of Use Cases
 
@@ -38,7 +42,8 @@ If you add base-paths like "admin" to the mix, the tool will generate even more 
 - https://vendorgo.abc.targetdomain.com/admin/vendorgo-qa/env
 - ... and many more
 
-If you know what you are doing, this tool can be a powerful ally in your arsenal for finding issues in web applications that common web application scanners will certainly miss.
+If you know what you are doing, this tool can be a powerful ally in your arsenal for finding issues in web applications
+that common web application scanners will certainly miss.
 
 ## Features
 
@@ -95,10 +100,12 @@ or
 - `-domain`: Single domain to scan (alternative to `-domains`)
 - `-paths`: File containing a list of paths to check on each domain (required)
 - `-markers`: File containing a list of content markers to search for (optional)
-- `-base-paths`: File containing list of base paths for additional URL generation (optional) (e.g., "..;/" - it should be one per line and end with "/")
+- `-base-paths`: File containing list of base paths for additional URL generation (optional) (e.g., "..;/" - it should
+  be one per line and end with "/")
 - `-concurrency`: Number of concurrent requests (default: 10)
 - `-use-fasthttp`: Use fasthttp instead of net/http (default: false)
-- `-host-depth`: How many sub-subdomains to use for path generation (e.g., 2 = test1-abc & test2 [based on test1-abc.test2.test3.example.com])
+- `-host-depth`: How many sub-subdomains to use for path generation (e.g., 2 = test1-abc &
+  test2 [based on test1-abc.test2.test3.example.com])
 - `-check-protocol`: Perform protocol check (determines if HTTP or HTTPS is supported) (default: false)
 - `-timeout`: Timeout for each request (default: 12s)
 - `-verbose`: Enable verbose output
@@ -106,7 +113,8 @@ or
 - `-dont-generate-paths`: Don't generate paths based on host structure (default: false)
 - `-dont-append-envs`: Prevent appending environment variables to requests (-qa, ...) (default: false)
 - `-append-bypasses-to-words`: Append bypasses to words (admin -> admin; -> admin..;) (default: false)
-- `-show-fetch-timeout-errors`: Shows fetch timeout errors - this is useful when scanning for large files. (default: false)
+- `-show-fetch-timeout-errors`: Shows fetch timeout errors - this is useful when scanning for large files. (default:
+  false)
 - `-min-size`: Minimum file size to detect, in bytes (default: 0)
 - `-max-content-size`: Maximum size of content to read for marker checking, in bytes (default: 5242880)
 - `-status`: HTTP status code to filter (default: 200)
@@ -164,7 +172,9 @@ or
    ```
 
 ## Understanding the flags
+
 There are basically some very important flags that you should understand before using the tool. These flags are:
+
 - `-host-depth`
 - `-dont-generate-paths`
 - `-dont-append-envs`
@@ -175,23 +185,39 @@ There are basically some very important flags that you should understand before 
 Given the following host structure: `housetodo.some-word.thisthat.example.com`
 
 ### check-protocol
-This flag is used to determine if the tool should check for HTTP or HTTPS support. If this flag is enabled, the tool will check if the domain supports HTTP or HTTPS. If the domain supports both, the tool will use HTTPS. If the domain supports only HTTP, the tool will use HTTP. If the domain supports only HTTPS, the tool will use HTTPS. The default protocol is https. http can be enforced with the `-force-http` flag.
+
+This flag is used to determine if the tool should check for HTTP or HTTPS support. If this flag is enabled, the tool
+will check if the domain supports HTTP or HTTPS. If the domain supports both, the tool will use HTTPS. If the domain
+supports only HTTP, the tool will use HTTP. If the domain supports only HTTPS, the tool will use HTTPS. The default
+protocol is https. http can be enforced with the `-force-http` flag.
 
 ### host-depth
-This flag is used to determine how many sub-subdomains to use for path generation. For example, if `-host-depth` is set to 2, the tool will generate paths based on `housetodo.some-word`. If `-host-depth` is set to 1, the tool will generate paths based on `housetodo` only.
+
+This flag is used to determine how many sub-subdomains to use for path generation. For example, if `-host-depth` is set
+to 2, the tool will generate paths based on `housetodo.some-word`. If `-host-depth` is set to 1, the tool will generate
+paths based on `housetodo` only.
 
 ### dont-generate-paths
-This will simply prevent the tool from generating paths based on the host structure. If this flag is enabled, the tool will only use the paths provided in the `-paths` file as well as in the `-base-paths` file.
+
+This will simply prevent the tool from generating paths based on the host structure. If this flag is enabled, the tool
+will only use the paths provided in the `-paths` file as well as in the `-base-paths` file.
 
 ### dont-append-envs
-This tool tries to generate sane value for relevant words. In our example one of those words would be `housetodo`. If this flag is enabled, the tool will not append environment variables to the requests. For example, if the tool detects `housetodo` as a word, it will not append `-qa`, `-dev`, `-prod`, etc. to the word.
+
+This tool tries to generate sane value for relevant words. In our example one of those words would be `housetodo`. If
+this flag is enabled, the tool will not append environment variables to the requests. For example, if the tool
+detects `housetodo` as a word, it will not append `-qa`, `-dev`, `-prod`, etc. to the word.
 
 ### append-bypasses-to-words
-This flag is used to append bypasses to words. For example, if the tool detects `admin` as a word, it will append `admin;` and `admin..;` etc. to the word. This is useful for bypassing filters.
+
+This flag is used to append bypasses to words. For example, if the tool detects `admin` as a word, it will
+append `admin;` and `admin..;` etc. to the word. This is useful for bypassing filters.
 
 ### use-static-separator
-This flags allows including a big wordlist (see input/english-words.txt) to split words into smaller words. For example, `vendortool` will be split into `vendortool`, `vendor` and `tool`. This is useful for more targeted path generation.
 
+This flags allows including a big wordlist (see input/english-words.txt) to split words into smaller words. For
+example, `vendortool` will be split into `vendortool`, `vendor` and `tool`. This is useful for more targeted path
+generation.
 
 ## How It Works
 
@@ -199,20 +225,24 @@ This flags allows including a big wordlist (see input/english-words.txt) to spli
 2. It reads the list of paths from the specified `-paths` file.
 3. If provided, it reads additional base paths from the `-base-paths` file.
 4. It analyzes each domain to extract meaningful components (subdomains, main domain, etc.).
-5. Using these components and the provided paths (and base paths if available), it dynamically generates a comprehensive set of URLs to scan.
-6. If `-use-static-separator` is enabled, it uses the words from `-static-separator-file` for more targeted path generation. More complex words are seperated into smaller words, e.g. vendortool will generate "vendortool","vendor" and "tool".
+5. Using these components and the provided paths (and base paths if available), it dynamically generates a comprehensive
+   set of URLs to scan.
+6. If `-use-static-separator` is enabled, it uses the words from `-static-separator-file` for more targeted path
+   generation. More complex words are seperated into smaller words, e.g. vendortool will generate "vendortool","vendor"
+   and "tool".
 7. Concurrent workers send HTTP GET requests to these URLs.
 8. For each response:
-   - The tool reads up to `max-content-size` bytes for marker checking.
-   - It determines the full file size by reading (and discarding) the remaining content.
-   - The response is analyzed based on:
-      * Presence of specified content markers in the read portion (if markers are provided)
-      * Total file size (compared against `min-size`)
-      * Content type (if specified)
-      * HTTP status code
+    - The tool reads up to `max-content-size` bytes for marker checking.
+    - It determines the full file size by reading (and discarding) the remaining content.
+    - The response is analyzed based on:
+        * Presence of specified content markers in the read portion (if markers are provided)
+        * Total file size (compared against `min-size`)
+        * Content type (if specified)
+        * HTTP status code
 9. Results are reported in real-time, with a progress bar indicating overall completion.
 
-This approach allows for efficient scanning of both small and large files, balancing thorough marker checking with memory-efficient handling of large files.
+This approach allows for efficient scanning of both small and large files, balancing thorough marker checking with
+memory-efficient handling of large files.
 
 ## Large File Handling
 
@@ -236,7 +266,8 @@ It is recommended to use a big timeout to allow the tool to read large files. Th
 ## Limitations
 
 - There's no built-in rate limiting (use the concurrency option to control request rate).
-- Very large scale scans might require significant bandwidth and processing power. It is recommended to separate the input files and run multiple instances of the tool on different machines.
+- Very large scale scans might require significant bandwidth and processing power. It is recommended to separate the
+  input files and run multiple instances of the tool on different machines.
 
 ## Contributing
 
@@ -252,4 +283,5 @@ The list is taken from https://github.com/dwyl/english-words/ ! Thanks for that!
 
 ## Disclaimer
 
-This tool is for educational and authorized testing purposes only. Misuse of this tool may be illegal. The authors are not responsible for any unauthorized use or damage caused by this tool.
+This tool is for educational and authorized testing purposes only. Misuse of this tool may be illegal. The authors are
+not responsible for any unauthorized use or damage caused by this tool.
