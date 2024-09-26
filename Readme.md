@@ -98,7 +98,7 @@ or
 - `-check-protocol`: Perform protocol check (determines if HTTP or HTTPS is supported) (default: false)
 - `-timeout`: Timeout for each request (default: 12s)
 - `-verbose`: Enable verbose output
-- `-dont-prepend-slash`: Don't prepend slash to paths - watch out and read code when used with base paths (default: false)
+- `-force-http`: Force HTTP (instead of HTTPS) requests (default: false)
 - `-dont-generate-paths`: Don't generate paths based on host structure (default: false)
 - `-dont-append-envs`: Prevent appending environment variables to requests (-qa, ...) (default: false)
 - `-append-bypasses-to-words`: Append bypasses to words (admin -> admin; -> admin..;) (default: false)
@@ -158,6 +158,36 @@ or
    ```
    ./dynamic_file_searcher -domain example.com -paths paths.txt -markers markers.txt -dont-generate-paths
    ```
+
+## Understanding the flags
+There are basically some very important flags that you should understand before using the tool. These flags are:
+- `-host-depth`
+- `-dont-generate-paths`
+- `-dont-append-envs`
+- `-append-bypasses-to-words`
+- `-use-static-separator`
+- `-check-protocol`
+
+Given the following host structure: `housetodo.some-word.thisthat.example.com`
+
+### check-protocol
+This flag is used to determine if the tool should check for HTTP or HTTPS support. If this flag is enabled, the tool will check if the domain supports HTTP or HTTPS. If the domain supports both, the tool will use HTTPS. If the domain supports only HTTP, the tool will use HTTP. If the domain supports only HTTPS, the tool will use HTTPS. The default protocol is https. http can be enforced with the `-force-http` flag.
+
+### host-depth
+This flag is used to determine how many sub-subdomains to use for path generation. For example, if `-host-depth` is set to 2, the tool will generate paths based on `housetodo.some-word`. If `-host-depth` is set to 1, the tool will generate paths based on `housetodo` only.
+
+### dont-generate-paths
+This will simply prevent the tool from generating paths based on the host structure. If this flag is enabled, the tool will only use the paths provided in the `-paths` file as well as in the `-base-paths` file.
+
+### dont-append-envs
+This tool tries to generate sane value for relevant words. In our example one of those words would be `housetodo`. If this flag is enabled, the tool will not append environment variables to the requests. For example, if the tool detects `housetodo` as a word, it will not append `-qa`, `-dev`, `-prod`, etc. to the word.
+
+### append-bypasses-to-words
+This flag is used to append bypasses to words. For example, if the tool detects `admin` as a word, it will append `admin;` and `admin..;` etc. to the word. This is useful for bypassing filters.
+
+### use-static-separator
+This flags allows including a big wordlist (see input/english-words.txt) to split words into smaller words. For example, `vendortool` will be split into `vendortool`, `vendor` and `tool`. This is useful for more targeted path generation.
+
 
 ## How It Works
 
