@@ -220,6 +220,8 @@ The tool efficiently handles large files and octet streams by:
 
 This allows for effective scanning of large files without running into memory issues.
 
+It is recommended to use a big timeout to allow the tool to read large files. The default timeout is 10 seconds.
+
 ## Security Considerations
 
 - Always ensure you have explicit permission to scan the target domains.
