@@ -27,7 +27,7 @@ The tool will generate paths like:
 - https://vendorgo.abc.targetdomain.com/vendorgo-qa/env
 - ... and many more
 
-If you add base-paths like "admin/" to the mix, the tool will generate even more paths:
+If you add base-paths like "admin" to the mix, the tool will generate even more paths:
 
 - https://vendorgo.abc.targetdomain.com/admin/env
 - https://vendorgo.abc.targetdomain.com/admin/vendorgo/env
