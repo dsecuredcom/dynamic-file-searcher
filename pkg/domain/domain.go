@@ -327,7 +327,7 @@ func extractWords(part string, cfg *config.Config) []string {
 
 	}
 
-	if cfg.DontGeneratePaths == true {
+	if cfg.DontGeneratePaths == false {
 		for subpart, _ := range words {
 			if onlyAlphaRegex.MatchString(subpart) {
 
