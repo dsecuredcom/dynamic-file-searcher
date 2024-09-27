@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -30,12 +31,10 @@ var (
 	ipPartRegex       = regexp.MustCompile(`(\d{1,3}[-\.]\d{1,3}[-\.]\d{1,3}[-\.]\d{1,3})`)
 	md5Regex          = regexp.MustCompile(`^[a-fA-F0-9]{32}$`)
 	onlyAlphaRegex    = regexp.MustCompile(`^[a-z]+$`)
-	envRegex          = regexp.MustCompile(`prod|qa|dev|stage|test|uat|stg|stg`)
-	numberSuffixRegex = regexp.MustCompile(`\d+$`)
-	envWords          = []string{"-prod", "-qa", "-dev", "-stage", "-test", "-uat", "-stg", "qa", "dev", "test", "-v1", "-v2", "1"}
-	regionPartRegex   = regexp.MustCompile(`(us-east-1|us-east-2|us-west-1|us-west-2|af-south-1|ap-east-1|ap-south-1|ap-northeast-3|ap-northeast-2|ap-southeast-1|ap-southeast-2|ap-southeast-3|ap-northeast-1|ca-central-1|eu-central-1|eu-west-1|eu-west-2|eu-west-3|eu-north-1|eu-south-1|me-south-1|sa-east-1|useast1|useast2|uswest1|uswest2|afsouth1|apeast1|apsouth1|apnortheast3|apnortheast2|apsoutheast1|apsoutheast2|apsoutheast3|apnortheast1|cacentral1|eucentral1|euwest1|euwest2|euwest3|eunorth1|eusouth1|mesouth1|saeast1)`)
-	singleDigitRegex  = regexp.MustCompile(`^(\d{1})$`)
-	singleCharRegex   = regexp.MustCompile(`^([a-z]{1,1})$`)
+	suffixNumberRegex = regexp.MustCompile(`[\d]+$`)
+	envRegex          = regexp.MustCompile(`(prod|qa|dev|testing|test|uat|stg|stage|staging|developement|production)$`)
+	appendEnvList     = []string{"prod", "qa", "dev", "test", "uat", "stg", "stage"}
+	regionPartRegex   = regexp.MustCompile(`(us-east|us-west|af-south|ap-east|ap-south|ap-northeast|ap-southeast|ca-central|eu-west|eu-north|eu-south|me-south|sa-east|us-east-1|us-east-2|us-west-1|us-west-2|af-south-1|ap-east-1|ap-south-1|ap-northeast-3|ap-northeast-2|ap-southeast-1|ap-southeast-2|ap-southeast-3|ap-northeast-1|ca-central-1|eu-central-1|eu-west-1|eu-west-2|eu-west-3|eu-north-1|eu-south-1|me-south-1|sa-east-1|useast1|useast2|uswest1|uswest2|afsouth1|apeast1|apsouth1|apnortheast3|apnortheast2|apsoutheast1|apsoutheast2|apsoutheast3|apnortheast1|cacentral1|eucentral1|euwest1|euwest2|euwest3|eunorth1|eusouth1|mesouth1|saeast1)`)
 	byPassCharacters  = []string{";", "..;"}
 )
 
@@ -70,6 +69,177 @@ var commonTLDs = []string{
 	"sy", "sz", "tc", "td", "tf", "tg", "th", "tj", "tk", "tl", "tm", "tn", "to", "tp", "tr", "tt",
 	"tv", "tw", "tz", "ua", "ug", "uk", "us", "uy", "uz", "va", "vc", "ve", "vg", "vi", "vn", "vu",
 	"wf", "ws", "ye", "yt", "za", "zm", "zw",
+}
+
+func splitDomain(host string, cfg *config.Config) []string {
+
+	if ipv4Regex.MatchString(host) || ipv6Regex.MatchString(host) {
+		return []string{}
+	}
+
+	// This is a super naive but effective approach
+	// 1. remove port in case it exists
+	host = strings.Split(host, ":")[0]
+	// Remove everything that looks like an ip (1-1-1-1, 1.1.1.1)
+	host = ipPartRegex.ReplaceAllString(host, "")
+	// Remove everything that looks like a hash
+	host = md5Regex.ReplaceAllString(host, "")
+	// Remove the top level domain
+	host = removeTLD(host)
+	// Remove regional parts, those are usually not interesting (proof me wrong!)
+	host = regionPartRegex.ReplaceAllString(host, "")
+
+	// Standardize the relevant host part
+	host = strings.ReplaceAll(host, "--", "-")
+	host = strings.ReplaceAll(host, "..", ".")
+	host = strings.ReplaceAll(host, "__", "_")
+
+	// Separate the host into parts
+	parts := strings.Split(host, ".")
+
+	// If the host depth is set, only take the first n parts
+	if cfg.HostDepth > 0 && len(parts) >= cfg.HostDepth {
+		parts = parts[:cfg.HostDepth]
+	}
+
+	var relevantParts map[string]bool
+	relevantParts = make(map[string]bool)
+
+	// add all parts to the relevant parts
+	for i := 0; i < len(parts); i++ {
+		relevantParts[parts[i]] = true
+
+		subParts := strings.FieldsFunc(parts[i], func(r rune) bool {
+			return r == '-' || r == '_'
+		})
+
+		// Add each subpart
+		for _, subPart := range subParts {
+			relevantParts[subPart] = true
+		}
+	}
+
+	var result []string
+	for part := range relevantParts {
+		// Drop parts that are numbers
+		if _, err := strconv.Atoi(part); err == nil {
+			continue
+		}
+
+		// If part is just a single character, skip it
+		if len(part) == 1 {
+			continue
+		}
+
+		// If part matches the envRegex, remove this env string and add the rest to results
+		if envRegex.MatchString(part) {
+			result = append(result, strings.ReplaceAll(part, envRegex.FindString(part), ""))
+		}
+
+		// If part ends with the numberPrefix, remove this numberPrefix and add the rest to results
+		if suffixNumberRegex.MatchString(part) {
+			result = append(result, strings.ReplaceAll(part, suffixNumberRegex.FindString(part), ""))
+		}
+
+		result = append(result, part)
+	}
+
+	// If appending env words is allowed, add them
+	if cfg.NoEnvAppending == false {
+		for _, part := range result {
+			// Skip base word when it is not alpha only
+			if onlyAlphaRegex.MatchString(part) == false {
+				continue
+			}
+
+			// Do some sanity checks, to prevent adding too many env words
+			shouldBeAdded := true
+
+			for _, env := range appendEnvList {
+				if strings.HasSuffix(part, env) {
+					shouldBeAdded = false
+					break
+				}
+			}
+
+			if shouldBeAdded {
+				for _, env := range appendEnvList {
+					if strings.Contains(part, env) {
+						continue
+					}
+					result = append(result, part+env)
+					result = append(result, part+"-"+env)
+				}
+			}
+		}
+	}
+
+	// If static word separator is enabled, use it to seperate words into smaller chunks
+	if cfg.UseStaticWordSeparator && len(cfg.StaticWords) > 0 {
+		for _, staticWord := range cfg.StaticWords {
+			if len(staticWord) <= 3 {
+				continue
+			}
+
+			for _, part := range result {
+				if onlyAlphaRegex.MatchString(part) == false {
+					continue
+				}
+
+				if len(part) < 6 {
+					continue
+				}
+
+				if strings.Contains(part, staticWord) {
+					result = append(result, staticWord)
+					result = append(result, strings.ReplaceAll(part, staticWord, ""))
+				}
+			}
+		}
+	}
+
+	// Cleaning, just in case I missed some edge cases
+	for i := 0; i < len(result); i++ {
+		result[i] = strings.TrimRight(result[i], ".-_")
+		result[i] = strings.TrimLeft(result[i], ".-_")
+
+		if result[i] == "" {
+			result = append(result[:i], result[i+1:]...)
+			i-- // Adjust index since we've removed an element
+		}
+	}
+
+	// Make list unique
+	result = makeUniqueList(result)
+	if cfg.AppendByPassesToWords {
+		for _, part := range result {
+			for _, bypass := range byPassCharacters {
+
+				result = append(result, part+bypass)
+			}
+		}
+	}
+
+	//fmt.Printf("\n")
+	//for _, part := range result {
+	//	fmt.Printf("%s\n", part)
+	//}
+	//
+	//syscall.Exit(1)
+
+	return result
+}
+
+func makeUniqueList(result []string) []string {
+	keys := make(map[string]bool)
+	list := []string{}
+	for _, entry := range result {
+		if _, value := keys[entry]; !value {
+			keys[entry] = true
+			list = append(list, entry)
+		}
+	}
+	return list
 }
 
 func isBlacklisted(content string) bool {
@@ -245,183 +415,6 @@ func GenerateURLs(domains, paths []string, cfg *config.Config) ([]string, int) {
 	utils.ShuffleStrings(allURLs)
 
 	return allURLs, len(domainProtocols)
-}
-
-func splitDomain(host string, cfg *config.Config) []string {
-
-	if ipv4Regex.MatchString(host) || ipv6Regex.MatchString(host) {
-		return []string{}
-	}
-
-	// Naive approach but lol
-	host = ipPartRegex.ReplaceAllString(host, "")
-	host = md5Regex.ReplaceAllString(host, "")
-	host = removeTLD(host)
-
-	parts := strings.Split(host, ".")
-
-	var RelevantPaths []string
-	cutset := "._-"
-	for _, part := range parts {
-
-		if singleDigitRegex.MatchString(part) {
-			continue
-		}
-
-		if singleCharRegex.MatchString(part) {
-			continue
-		}
-
-		part = regionPartRegex.ReplaceAllString(part, "")
-
-		part = strings.TrimRight(strings.TrimLeft(part, cutset), cutset)
-		RelevantPaths = append(RelevantPaths, part)
-	}
-
-	//fmt.Println(RelevantPaths)
-	//syscall.Exit(1)
-
-	// Limit to host-depth, take the first X parts
-	if cfg.HostDepth > 0 && len(RelevantPaths) > cfg.HostDepth {
-		RelevantPaths = RelevantPaths[:cfg.HostDepth]
-	}
-
-	var words []string
-
-	for _, part := range RelevantPaths {
-		words = CombineUniqueStringSlices(words, extractWords(part, cfg))
-
-		if cfg.UseStaticWordSeparator && len(cfg.StaticWords) > 0 && onlyAlphaRegex.MatchString(part) {
-			for _, staticword := range cfg.StaticWords {
-				if strings.Contains(part, staticword) {
-					words = append(words, staticword)
-					words = append(words, strings.ReplaceAll(part, staticword, ""))
-				}
-			}
-		}
-
-	}
-
-	filteredWords := filterWords(words)
-
-	if cfg.AppendByPassesToWords {
-		filteredWords = CombineUniqueStringSlices(filteredWords, createBypassedWords(filteredWords))
-	}
-
-	return filteredWords
-}
-
-func createBypassedWords(words []string) []string {
-	newWords := make([]string, 0)
-
-	for _, word := range words {
-		for _, bypass := range byPassCharacters {
-			newWords = append(newWords, fmt.Sprintf("%s%s", word, bypass))
-		}
-	}
-
-	return newWords
-}
-
-func extractWords(part string, cfg *config.Config) []string {
-	subparts := regexp.MustCompile(`[._-]`).Split(part, -1)
-
-	words := make(map[string]bool)
-
-	for _, subpart := range subparts {
-		if subpart != "" {
-			words[subpart] = true
-		}
-
-		if numberSuffixRegex.MatchString(subpart) {
-			words[numberSuffixRegex.ReplaceAllString(subpart, "")] = true
-		}
-
-	}
-
-	if cfg.NoEnvAppending == false {
-		for subpart, _ := range words {
-			if onlyAlphaRegex.MatchString(subpart) {
-
-				if envRegex.MatchString(subpart) {
-					continue
-				}
-
-				for _, word := range envWords {
-					if strings.Contains(subpart, word) {
-						break
-					}
-
-					words[subpart+word] = true
-				}
-			}
-		}
-	}
-
-	words[part] = true
-
-	if strings.Contains(part, "-") {
-		hyphenParts := strings.Split(part, "-")
-		for i := 1; i <= len(hyphenParts); i++ {
-			words[strings.Join(hyphenParts[:i], "-")] = true
-		}
-
-		for _, hyphenPart := range hyphenParts[1:] {
-			words[hyphenPart] = true
-		}
-	}
-
-	var FilteredWords []string
-	for word := range words {
-		FilteredWords = append(FilteredWords, word)
-	}
-
-	return FilteredWords
-}
-
-func filterWords(words []string) []string {
-	var filteredWords []string
-	for _, word := range words {
-		if !shouldFilterWord(word) {
-			filteredWords = append(filteredWords, word)
-		}
-	}
-	return filteredWords
-}
-
-func shouldFilterWord(word string) bool {
-
-	if strings.Count(word, "-")+strings.Count(word, "_") > 2 {
-		return true
-	}
-
-	// @todo: add more filters
-	// makes no sense, check here.
-	for _, env := range envWords {
-		if strings.HasPrefix(word, env) {
-			return true
-		}
-	}
-
-	return false
-}
-
-func CombineUniqueStringSlices(slice1, slice2 []string) []string {
-	uniqueMap := make(map[string]bool)
-
-	for _, s := range slice1 {
-		uniqueMap[s] = true
-	}
-	for _, s := range slice2 {
-		uniqueMap[s] = true
-	}
-
-	combined := make([]string, 0, len(uniqueMap))
-	for s := range uniqueMap {
-		combined = append(combined, s)
-	}
-
-	return combined
 }
 
 func removeTLD(host string) string {
