@@ -4,7 +4,8 @@
 
 Dynamic File Searcher is an advanced, Go-based CLI tool designed for intelligent and deep web crawling. Its unique
 strength lies in its ability to dynamically generate and explore paths based on the target hosts, allowing for much
-deeper and more comprehensive scans than traditional tools.
+deeper and more comprehensive scans than traditional tools. This tool is part of <a href="https://www.dsecured.com/argos-security-plattform">DSecured's eASM Argos</a> since several
+years and still generates value for our customers.
 
 ### Key Differentiators
 
