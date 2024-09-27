@@ -163,11 +163,12 @@ func trackProgress(processedCount, totalURLs *int64, done chan bool) {
 				percentage := float64(currentProcessed) / float64(total) * 100
 				estimatedTotal := float64(elapsed) / (float64(currentProcessed) / float64(total))
 				remainingTime := time.Duration(estimatedTotal - float64(elapsed))
-
+				fmt.Printf("\r%-100s", "")
 				fmt.Printf("\rProgress: %.2f%% (%d/%d) | RPS: %.2f | Elapsed: %s | ETA: %s",
 					percentage, currentProcessed, total, rps,
 					elapsed.Round(time.Second), remainingTime.Round(time.Second))
 			} else {
+				fmt.Printf("\r%-100s", "")
 				fmt.Printf("\rProcessed: %d | RPS: %.2f | Elapsed: %s",
 					currentProcessed, rps, elapsed.Round(time.Second))
 			}
