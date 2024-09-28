@@ -118,6 +118,7 @@ or
 - `-proxy`: Proxy URL (e.g., http://127.0.0.1:8080)
 - `-use-static-separator`: Use static word separator (default: false)
 - `-content-type`: Content type to filter (default: all)
+- `-disallowed-content-type`: Content-Type header value to filter out (csv allowed, e.g. json,octet)
 - `-static-separator-file`: File containing static words for separation (required if `-use-static-separator` is true)
 
 ### Examples

@@ -56,27 +56,27 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		rulesCount++
 	}
 
-	rulesMatchd := 0
+	rulesMatched := 0
 
 	if result.StatusCode == cfg.HTTPStatusCode {
-		rulesMatchd++
+		rulesMatched++
 	}
 
 	if cfg.MinFileSize > 0 && result.FileSize >= cfg.MinFileSize {
-		rulesMatchd++
+		rulesMatched++
 	}
 
 	if cfg.ContentType != "" {
 		contentTypes := strings.Split(cfg.ContentType, ",")
 		for _, contentType := range contentTypes {
-			if strings.Contains(result.ContentType, contentType) {
-				rulesMatchd++
+			if strings.Contains(result.ContentType, contentType) && isDisallowedContentType(result.ContentType, cfg.DisallowedContentType) == false {
+				rulesMatched++
 				break
 			}
 		}
 	}
 
-	if rulesMatchd == rulesCount {
+	if rulesMatched == rulesCount {
 		color.Red("\n[!]\tFound based on rules: 'S: %d, FS: %d', CT: %s in %s", result.StatusCode, result.FileSize, result.ContentType, result.URL)
 		if len(result.Content) > 150 {
 			color.Green("\n[!]\tBody: %s\n", result.Content[:150])
@@ -89,4 +89,22 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		log.Printf("Processed: %s (Status: %d, Size: %d bytes, Type: %s)\n",
 			result.URL, result.StatusCode, result.FileSize, result.ContentType)
 	}
+}
+
+func isDisallowedContentType(contentType string, disallowedContentTypes string) bool {
+
+	if disallowedContentTypes == "" {
+		return false
+	}
+
+	disallowedContentTypesList := strings.Split(disallowedContentTypes, ",")
+
+	for _, disallowedContentType := range disallowedContentTypesList {
+		if strings.Contains(contentType, disallowedContentType) {
+			return true
+		}
+	}
+
+	return false
+
 }
