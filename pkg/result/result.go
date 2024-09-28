@@ -67,9 +67,13 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 	}
 
 	if cfg.ContentType != "" {
-		contentTypes := strings.Split(cfg.ContentType, ",")
-		for _, contentType := range contentTypes {
-			if strings.Contains(result.ContentType, contentType) && isDisallowedContentType(result.ContentType, cfg.DisallowedContentType) == false {
+		AllowedContentTypes := strings.ToLower(result.ContentType)
+		AllowedContentTypesList := strings.Split(AllowedContentTypes, ",")
+		ResultContentType := strings.ToLower(result.ContentType)
+		DisallowedContentTypes := strings.ToLower(cfg.DisallowedContentType)
+		DisallowedContentTypesList := strings.Split(DisallowedContentTypes, ",")
+		for _, AllowedContentTypeString := range AllowedContentTypesList {
+			if strings.Contains(ResultContentType, AllowedContentTypeString) && isDisallowedContentType(ResultContentType, DisallowedContentTypesList) == false {
 				rulesMatched++
 				break
 			}
@@ -91,15 +95,9 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 	}
 }
 
-func isDisallowedContentType(contentType string, disallowedContentTypes string) bool {
+func isDisallowedContentType(contentType string, DisallowedContentTypesList []string) bool {
 
-	if disallowedContentTypes == "" {
-		return false
-	}
-
-	disallowedContentTypesList := strings.Split(disallowedContentTypes, ",")
-
-	for _, disallowedContentType := range disallowedContentTypesList {
+	for _, disallowedContentType := range DisallowedContentTypesList {
 		if strings.Contains(contentType, disallowedContentType) {
 			return true
 		}
