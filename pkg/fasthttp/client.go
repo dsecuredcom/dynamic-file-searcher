@@ -1,6 +1,7 @@
 package fasthttp
 
 import (
+	"bytes"
 	"crypto/tls"
 	"fmt"
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/config"
@@ -8,6 +9,7 @@ import (
 	"github.com/fatih/color"
 	"github.com/valyala/fasthttp"
 	"math/rand"
+	"strconv"
 	"strings"
 )
 
@@ -51,6 +53,7 @@ func (c *Client) MakeRequest(url string) result.Result {
 	req.Header.SetMethod(fasthttp.MethodGet)
 	req.Header.Set("Connection", "keep-alive")
 	req.Header.SetProtocol("HTTP/1.1")
+	req.Header.Set("Range", fmt.Sprintf("bytes=0-%d", c.config.MaxContentSize-1))
 
 	randomizeRequest(req)
 	for key, value := range c.config.ExtraHeaders {
@@ -82,9 +85,19 @@ func (c *Client) MakeRequest(url string) result.Result {
 	}
 
 	body := resp.Body()
-	bodySize := len(body)
+	var totalSize int64
 
-	if int64(bodySize) > c.config.MaxContentSize {
+	contentRange := resp.Header.Peek("Content-Range")
+	if len(contentRange) > 0 {
+		parts := bytes.Split(contentRange, []byte("/"))
+		if len(parts) == 2 {
+			totalSize, _ = strconv.ParseInt(string(parts[1]), 10, 64)
+		}
+	} else {
+		totalSize = int64(len(body))
+	}
+
+	if int64(len(body)) > c.config.MaxContentSize {
 		body = body[:c.config.MaxContentSize]
 	}
 
@@ -92,7 +105,7 @@ func (c *Client) MakeRequest(url string) result.Result {
 		URL:         url,
 		Content:     string(body),
 		StatusCode:  resp.StatusCode(),
-		FileSize:    int64(bodySize),
+		FileSize:    totalSize,
 		ContentType: string(resp.Header.Peek("Content-Type")),
 	}
 }

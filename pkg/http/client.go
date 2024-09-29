@@ -8,6 +8,7 @@ import (
 	"io"
 	"math/rand"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -74,6 +75,7 @@ func (c *Client) MakeRequest(url string) result.Result {
 		req.Header.Set(key, value)
 	}
 
+	req.Header.Set("Range", fmt.Sprintf("bytes=0-%d", c.config.MaxContentSize-1))
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		if c.config.ShowFetchTimeoutErrors && strings.Contains(err.Error(), "context deadline exceeded") {
@@ -83,19 +85,20 @@ func (c *Client) MakeRequest(url string) result.Result {
 	}
 	defer resp.Body.Close()
 
-	buffer := make([]byte, c.config.MaxContentSize)
-	n, err := io.ReadFull(resp.Body, buffer)
-	if err != nil && err != io.ErrUnexpectedEOF {
+	buffer, err := io.ReadAll(resp.Body)
+	if err != nil {
 		return result.Result{URL: url, Error: fmt.Errorf("error reading body: %w", err)}
 	}
-	buffer = buffer[:n]
 
-	remainingSize, err := io.Copy(io.Discard, resp.Body)
-	if err != nil {
-		return result.Result{URL: url, Error: fmt.Errorf("error reading remaining body: %w", err)}
+	var totalSize int64
+	if contentRange := resp.Header.Get("Content-Range"); contentRange != "" {
+		parts := strings.Split(contentRange, "/")
+		if len(parts) == 2 {
+			totalSize, _ = strconv.ParseInt(parts[1], 10, 64)
+		}
+	} else {
+		totalSize = int64(len(buffer))
 	}
-
-	totalSize := int64(n) + remainingSize
 
 	return result.Result{
 		URL:         url,
