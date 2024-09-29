@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/config"
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/domain"
@@ -9,6 +10,7 @@ import (
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/result"
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/utils"
 	"github.com/fatih/color"
+	"golang.org/x/time/rate"
 	"math/rand"
 	"os"
 	"sync"
@@ -26,6 +28,7 @@ func main() {
 	initialDomains := domain.GetDomains(cfg.DomainsFile, cfg.Domain)
 	paths := utils.ReadLines(cfg.PathsFile)
 	markers := utils.ReadLines(cfg.MarkersFile)
+	limiter := rate.NewLimiter(rate.Limit(cfg.Concurrency), 1)
 
 	validateInput(initialDomains, paths, markers)
 
@@ -54,7 +57,7 @@ func main() {
 	var wg sync.WaitGroup
 	for i := 0; i < cfg.Concurrency; i++ {
 		wg.Add(1)
-		go worker(urlChan, resultsChan, &wg, cfg, client, &processedCount)
+		go worker(urlChan, resultsChan, &wg, cfg, client, &processedCount, limiter)
 	}
 
 	done := make(chan bool)
@@ -117,10 +120,11 @@ func generateURLs(initialDomains, paths []string, cfg config.Config, urlChan cha
 
 func worker(urls <-chan string, results chan<- result.Result, wg *sync.WaitGroup, cfg config.Config, client interface {
 	MakeRequest(url string) result.Result
-}, processedCount *int64) {
+}, processedCount *int64, limiter *rate.Limiter) {
 	defer wg.Done()
 
 	for url := range urls {
+		limiter.Wait(context.Background())
 		res := client.MakeRequest(url)
 		atomic.AddInt64(processedCount, 1)
 		results <- res
