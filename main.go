@@ -124,7 +124,10 @@ func worker(urls <-chan string, results chan<- result.Result, wg *sync.WaitGroup
 	defer wg.Done()
 
 	for url := range urls {
-		limiter.Wait(context.Background())
+		err := limiter.Wait(context.Background())
+		if err != nil {
+			continue
+		}
 		res := client.MakeRequest(url)
 		atomic.AddInt64(processedCount, 1)
 		results <- res
