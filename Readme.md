@@ -55,7 +55,6 @@ that common web application scanners will certainly miss.
 - Skipping certain domains when WAF is detected
 - Proxy support for anonymous scanning
 - Verbose mode for detailed output and analysis
-- Static word separator option for more targeted searches
 
 ## Installation
 
@@ -100,9 +99,7 @@ or
   be one per line and end with "/")
 - `-concurrency`: Number of concurrent requests (default: 10)
 - `-use-fasthttp`: Use fasthttp instead of net/http (default: false)
-- `-host-depth`: How many sub-subdomains to use for path generation (e.g., 2 = test1-abc &
-  test2 [based on test1-abc.test2.test3.example.com])
-- `-check-protocol`: Perform protocol check (determines if HTTP or HTTPS is supported) (default: false)
+- `-host-depth`: How many sub-subdomains to use for path generation (e.g., 2 = test1-abc & test2 [based on test1-abc.test2.test3.example.com])
 - `-timeout`: Timeout for each request (default: 12s)
 - `-verbose`: Enable verbose output
 - `-force-http`: Force HTTP (instead of HTTPS) requests (default: false)
@@ -116,10 +113,8 @@ or
 - `-status`: HTTP status code to filter (default: 200)
 - `-headers`: Extra headers to add to each request (format: 'Header1:Value1,Header2:Value2')
 - `-proxy`: Proxy URL (e.g., http://127.0.0.1:8080)
-- `-use-static-separator`: Use static word separator (default: false)
 - `-content-type`: Content type to filter (default: all)
 - `-disallowed-content-type`: Content-Type header value to filter out (csv allowed, e.g. json,octet)
-- `-static-separator-file`: File containing static words for separation (required if `-use-static-separator` is true)
 
 ### Examples
 
@@ -148,22 +143,12 @@ or
    ./dynamic_file_searcher -domain example.com -paths paths.txt -markers markers.txt -proxy http://127.0.0.1:8080 -status 403 -headers "User-Agent:CustomBot/1.0"
    ```
 
-6. Use static word separator for more targeted searches:
-   ```
-   ./dynamic_file_searcher -domain example.com -paths paths.txt -markers markers.txt -use-static-separator -static-separator-file input/english-words.txt
-   ```
-
-7. Perform protocol check and increase concurrency:
-   ```
-   ./dynamic_file_searcher -domains domains.txt -paths paths.txt -markers markers.txt -check-protocol -concurrency 50
-   ```
-
-8. Verbose output with custom timeout:
+6. Verbose output with custom timeout:
    ```
    ./dynamic_file_searcher -domain example.com -paths paths.txt -markers markers.txt -verbose -timeout 30s
    ```
 
-9. Scan only root paths without generating additional paths:
+7. Scan only root paths without generating additional paths:
    ```
    ./dynamic_file_searcher -domain example.com -paths paths.txt -markers markers.txt -dont-generate-paths
    ```
@@ -176,17 +161,8 @@ There are basically some very important flags that you should understand before 
 - `-dont-generate-paths`
 - `-dont-append-envs`
 - `-append-bypasses-to-words`
-- `-use-static-separator`
-- `-check-protocol`
 
 Given the following host structure: `housetodo.some-word.thisthat.example.com`
-
-### check-protocol
-
-This flag is used to determine if the tool should check for HTTP or HTTPS support. If this flag is enabled, the tool
-will check if the domain supports HTTP or HTTPS. If the domain supports both, the tool will use HTTPS. If the domain
-supports only HTTP, the tool will use HTTP. If the domain supports only HTTPS, the tool will use HTTPS. The default
-protocol is https. http can be enforced with the `-force-http` flag.
 
 ### host-depth
 
@@ -210,12 +186,6 @@ detects `housetodo` as a word, it will not append `-qa`, `-dev`, `-prod`, etc. t
 This flag is used to append bypasses to words. For example, if the tool detects `admin` as a word, it will
 append `admin;` and `admin..;` etc. to the word. This is useful for bypassing filters.
 
-### use-static-separator
-
-This flags allows including a big wordlist (see input/english-words.txt) to split words into smaller words. For
-example, `vendortool` will be split into `vendortool`, `vendor` and `tool`. This is useful for more targeted path
-generation.
-
 ## How It Works
 
 1. The tool reads the domain(s) from either the `-domain` flag or the `-domains` file.
@@ -224,11 +194,8 @@ generation.
 4. It analyzes each domain to extract meaningful components (subdomains, main domain, etc.).
 5. Using these components and the provided paths (and base paths if available), it dynamically generates a comprehensive
    set of URLs to scan.
-6. If `-use-static-separator` is enabled, it uses the words from `-static-separator-file` for more targeted path
-   generation. More complex words are seperated into smaller words, e.g. vendortool will generate "vendortool","vendor"
-   and "tool".
-7. Concurrent workers send HTTP GET requests to these URLs.
-8. For each response:
+6. Concurrent workers send HTTP GET requests to these URLs.
+7. For each response:
     - The tool reads up to `max-content-size` bytes for marker checking.
     - It determines the full file size by reading (and discarding) the remaining content.
     - The response is analyzed based on:
@@ -236,7 +203,7 @@ generation.
         * Total file size (compared against `min-size`)
         * Content type (if specified)
         * HTTP status code
-9. Results are reported in real-time, with a progress bar indicating overall completion.
+8. Results are reported in real-time, with a progress bar indicating overall completion.
 
 This approach allows for efficient scanning of both small and large files, balancing thorough marker checking with
 memory-efficient handling of large files.
@@ -274,9 +241,6 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 This project is licensed under the MIT License - see the LICENSE file for details.
 
-# English word list
-
-The list is taken from https://github.com/dwyl/english-words/ ! Thanks for that!
 
 ## Disclaimer
 

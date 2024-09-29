@@ -11,33 +11,29 @@ import (
 )
 
 type Config struct {
-	DomainsFile             string
-	Domain                  string
-	PathsFile               string
-	MarkersFile             string
-	BasePathsFile           string
-	Concurrency             int
-	HostDepth               int
-	Timeout                 time.Duration
-	Verbose                 bool
-	ProxyURL                *url.URL
-	ExtraHeaders            map[string]string
-	MinFileSize             int64
-	MaxContentSize          int64
-	HTTPStatusCode          int
-	ContentType             string
-	DisallowedContentType   string
-	AppendByPassesToWords   bool
-	BasePaths               []string
-	PerformProtocolCheck    bool
-	DontGeneratePaths       bool
-	UseStaticWordSeparator  bool
-	StaticWordSeparatorFile string
-	StaticWords             []string
-	FastHTTP                bool
-	NoEnvAppending          bool
-	ShowFetchTimeoutErrors  bool
-	ForceHTTPProt           bool
+	DomainsFile            string
+	Domain                 string
+	PathsFile              string
+	MarkersFile            string
+	BasePathsFile          string
+	Concurrency            int
+	HostDepth              int
+	Timeout                time.Duration
+	Verbose                bool
+	ProxyURL               *url.URL
+	ExtraHeaders           map[string]string
+	MinFileSize            int64
+	MaxContentSize         int64
+	HTTPStatusCode         int
+	ContentType            string
+	DisallowedContentType  string
+	AppendByPassesToWords  bool
+	BasePaths              []string
+	DontGeneratePaths      bool
+	FastHTTP               bool
+	NoEnvAppending         bool
+	ShowFetchTimeoutErrors bool
+	ForceHTTPProt          bool
 }
 
 func ParseFlags() Config {
@@ -51,7 +47,6 @@ func ParseFlags() Config {
 	flag.StringVar(&cfg.BasePathsFile, "base-paths", "", "File containing list of base paths")
 	flag.IntVar(&cfg.Concurrency, "concurrency", 10, "Number of concurrent requests")
 	flag.IntVar(&cfg.HostDepth, "host-depth", 6, "How many sub-subdomains to use for path generation (e.g., 2 = test1-abc & test2 [based on test1-abc.test2.test3.example.com])")
-	flag.BoolVar(&cfg.PerformProtocolCheck, "check-protocol", false, "Perform protocol check (determines if HTTP or HTTPS is supported)")
 	flag.BoolVar(&cfg.DontGeneratePaths, "dont-generate-paths", false, "If true, only the base paths (or nothing) will be used for scanning")
 	flag.DurationVar(&cfg.Timeout, "timeout", 12*time.Second, "Timeout for each request")
 	flag.BoolVar(&cfg.Verbose, "verbose", false, "Verbose output")
@@ -59,9 +54,7 @@ func ParseFlags() Config {
 	flag.BoolVar(&cfg.FastHTTP, "use-fasthttp", false, "Use fasthttp instead of net/http")
 	flag.BoolVar(&cfg.ForceHTTPProt, "force-http", false, "Force the usage of http:// instead of https://")
 	flag.BoolVar(&cfg.NoEnvAppending, "dont-append-envs", false, "Prevent appending environment variables to requests (-qa, ...)")
-	flag.BoolVar(&cfg.UseStaticWordSeparator, "use-static-separator", false, "Use static word separator")
 	flag.BoolVar(&cfg.ShowFetchTimeoutErrors, "show-fetch-timeout-errors", false, "Shows fetch timeout errors - this is useful when scanning for large files.")
-	flag.StringVar(&cfg.StaticWordSeparatorFile, "static-separator-file", "", "File containing static words for separation")
 	flag.StringVar(&cfg.ContentType, "content-type", "", "Content-Type header value to filter (csv allowed, e.g. json,octet)")
 	flag.StringVar(&cfg.DisallowedContentType, "disallowed-content-type", "", "Content-Type header value to filter out (csv allowed, e.g. json,octet)")
 	flag.Int64Var(&cfg.MinFileSize, "min-size", 0, "Minimum file size to detect (in bytes)")
@@ -110,44 +103,7 @@ func ParseFlags() Config {
 		}
 	}
 
-	if cfg.UseStaticWordSeparator {
-		if cfg.StaticWordSeparatorFile == "" {
-			fmt.Println("Please provide a file with static words when using -use-static-separator")
-			flag.PrintDefaults()
-			os.Exit(1)
-		}
-		var err error
-		cfg.StaticWords, err = loadStaticWords(cfg.StaticWordSeparatorFile)
-		if err != nil {
-			fmt.Printf("Error loading static words: %v\n", err)
-			os.Exit(1)
-		}
-	}
-
 	return cfg
-}
-
-func loadStaticWords(filename string) ([]string, error) {
-	file, err := os.Open(filename)
-	if err != nil {
-		return nil, err
-	}
-	defer file.Close()
-
-	var words []string
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		word := strings.TrimSpace(scanner.Text())
-		if len(word) > 4 {
-			words = append(words, word)
-		}
-	}
-
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-
-	return words, nil
 }
 
 func readBasePaths(filename string) ([]string, error) {

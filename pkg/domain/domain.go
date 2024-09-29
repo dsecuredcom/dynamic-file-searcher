@@ -1,18 +1,12 @@
 package domain
 
 import (
-	"crypto/tls"
 	"fmt"
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/config"
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/utils"
-	"github.com/schollz/progressbar/v3"
-	"io"
-	"net/http"
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
-	"time"
 )
 
 type domainProtocol struct {
@@ -174,30 +168,6 @@ func splitDomain(host string, cfg *config.Config) []string {
 		}
 	}
 
-	// If static word separator is enabled, use it to seperate words into smaller chunks
-	if cfg.UseStaticWordSeparator && len(cfg.StaticWords) > 0 {
-		for _, staticWord := range cfg.StaticWords {
-			if len(staticWord) <= 3 {
-				continue
-			}
-
-			for _, part := range result {
-				if onlyAlphaRegex.MatchString(part) == false {
-					continue
-				}
-
-				if len(part) < 6 {
-					continue
-				}
-
-				if strings.Contains(part, staticWord) {
-					result = append(result, staticWord)
-					result = append(result, strings.ReplaceAll(part, staticWord, ""))
-				}
-			}
-		}
-	}
-
 	// Cleaning, just in case I missed some edge cases
 	for i := 0; i < len(result); i++ {
 		result[i] = strings.TrimRight(result[i], ".-_")
@@ -252,99 +222,6 @@ func isBlacklisted(content string) bool {
 	return false
 }
 
-func checkDomainProtocol(domain string, cfg *config.Config) (string, bool) {
-	transport := &http.Transport{
-		TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-	}
-	httpClient := &http.Client{
-		Transport: transport,
-		Timeout:   10 * time.Second,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			return http.ErrUseLastResponse
-		},
-	}
-
-	makeRequest := func(protocol string) (*http.Response, error) {
-		url := fmt.Sprintf("%s://%s", protocol, domain)
-		req, err := http.NewRequest("GET", url, nil)
-		if err != nil {
-			return nil, err
-		}
-
-		req.Header.Set("Referer", url)
-		req.Header.Set("Origin", url)
-		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36")
-
-		for key, value := range cfg.ExtraHeaders {
-			req.Header.Set(key, value)
-		}
-
-		return httpClient.Do(req)
-	}
-
-	resp, err := makeRequest("https")
-	if err == nil {
-		defer resp.Body.Close()
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024)) // Read first 1KB
-		if isBlacklisted(string(body)) {
-			return "", true
-		}
-		return "https", false
-	}
-
-	resp, err = makeRequest("http")
-	if err == nil {
-		defer resp.Body.Close()
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024)) // Read first 1KB
-		if isBlacklisted(string(body)) {
-			return "", true
-		}
-		return "http", false
-	}
-
-	return "https", false
-}
-
-func checkDomainsProtocols(domains []string, workers int, cfg *config.Config) []domainProtocol {
-	results := make([]domainProtocol, 0, len(domains))
-	jobs := make(chan string, len(domains))
-	resultsChan := make(chan domainProtocol, len(domains))
-
-	var wg sync.WaitGroup
-
-	bar := progressbar.Default(int64(len(domains)), "Checking protocols")
-
-	for i := 0; i < workers; i++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for domain := range jobs {
-				protocol, blacklisted := checkDomainProtocol(domain, cfg)
-				if !blacklisted {
-					resultsChan <- domainProtocol{domain: domain, protocol: protocol}
-				}
-				bar.Add(1)
-			}
-		}()
-	}
-
-	for _, domain := range domains {
-		jobs <- domain
-	}
-	close(jobs)
-
-	go func() {
-		wg.Wait()
-		close(resultsChan)
-	}()
-
-	for result := range resultsChan {
-		results = append(results, result)
-	}
-
-	return results
-}
-
 func GetDomains(domainsFile, singleDomain string) []string {
 	if domainsFile != "" {
 		allLines := utils.ReadLines(domainsFile)
@@ -363,16 +240,12 @@ func GetDomains(domainsFile, singleDomain string) []string {
 func GenerateURLs(domains, paths []string, cfg *config.Config) ([]string, int) {
 	var domainProtocols []domainProtocol
 
-	if cfg.PerformProtocolCheck {
-		domainProtocols = checkDomainsProtocols(domains, 100, cfg)
-	} else {
-		var proto = "https"
-		if cfg.ForceHTTPProt {
-			proto = "http"
-		}
-		for _, d := range domains {
-			domainProtocols = append(domainProtocols, domainProtocol{domain: d, protocol: proto})
-		}
+	var proto = "https"
+	if cfg.ForceHTTPProt {
+		proto = "http"
+	}
+	for _, d := range domains {
+		domainProtocols = append(domainProtocols, domainProtocol{domain: d, protocol: proto})
 	}
 
 	var allURLs []string

@@ -90,18 +90,6 @@ func validateInput(initialDomains, paths, markers []string) {
 }
 
 func printInitialInfo(cfg config.Config, initialDomains, paths []string) {
-	if cfg.PerformProtocolCheck {
-		color.Cyan("[*] Checking protocols and blacklist for %d domains concurrently...", len(initialDomains))
-	} else {
-		color.Cyan("[*] Skipping protocol check, using HTTPS for all domains...")
-	}
-
-	if cfg.UseStaticWordSeparator {
-		color.Cyan("[*] Static word separation is active")
-		color.Cyan("[*] Loaded %d entries for word separation", len(cfg.StaticWords))
-	} else {
-		color.Cyan("[*] Using default word separation")
-	}
 
 	color.Cyan("[i] Scanning %d domains with %d paths", len(initialDomains), len(paths))
 	color.Cyan("[i] Minimum file size to detect: %d bytes", cfg.MinFileSize)
