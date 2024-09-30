@@ -92,7 +92,7 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		return
 	}
 
-	if rulesMatched == rulesCount {
+	if rulesCount > 0 && rulesMatched == rulesCount {
 		color.Red("\n[!]\tFound based on rules: 'S: %d, FS: %d', CT: %s in %s", result.StatusCode, result.FileSize, result.ContentType, result.URL)
 		if len(result.Content) > 150 {
 			color.Green("\n[!]\tBody: %s\n", result.Content[:150])
