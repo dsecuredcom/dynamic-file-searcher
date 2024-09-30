@@ -23,11 +23,16 @@ const (
 )
 
 func main() {
+	var markers []string
+
 	cfg := config.ParseFlags()
 
 	initialDomains := domain.GetDomains(cfg.DomainsFile, cfg.Domain)
 	paths := utils.ReadLines(cfg.PathsFile)
-	markers := utils.ReadLines(cfg.MarkersFile)
+	if cfg.MarkersFile != "" {
+		markers = utils.ReadLines(cfg.MarkersFile)
+	}
+
 	limiter := rate.NewLimiter(rate.Limit(cfg.Concurrency), 1)
 
 	validateInput(initialDomains, paths, markers)
