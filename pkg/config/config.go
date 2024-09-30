@@ -69,8 +69,14 @@ func ParseFlags() Config {
 
 	flag.Parse()
 
-	if (cfg.DomainsFile == "" && cfg.Domain == "") || cfg.PathsFile == "" || cfg.MarkersFile == "" {
-		fmt.Println("Please provide either -domains file or -domain, along with -paths and -markers files")
+	if (cfg.DomainsFile == "" && cfg.Domain == "") && cfg.PathsFile == "" {
+		fmt.Println("Please provide either -domains file or -domain, along with -paths")
+		flag.PrintDefaults()
+		os.Exit(1)
+	}
+
+	if (cfg.DomainsFile != "" || cfg.Domain != "") && cfg.PathsFile != "" && cfg.MarkersFile == "" && noRulesSpecified(cfg) {
+		fmt.Println("If you provide -domains or -domain and -paths, you must provide at least one of -markers, -http-status, -content-types, -min-content-size, or -disallowed-content-types")
 		flag.PrintDefaults()
 		os.Exit(1)
 	}
@@ -104,6 +110,28 @@ func ParseFlags() Config {
 	}
 
 	return cfg
+}
+
+func noRulesSpecified(cfg Config) bool {
+	noRules := true
+
+	if cfg.HTTPStatusCode > 0 {
+		noRules = false
+	}
+
+	if cfg.MinContentSize > 0 {
+		noRules = false
+	}
+
+	if cfg.ContentTypes != "" {
+		noRules = false
+	}
+
+	if cfg.DisallowedContentTypes != "" {
+		noRules = false
+	}
+
+	return noRules
 }
 
 func readBasePaths(filename string) ([]string, error) {
