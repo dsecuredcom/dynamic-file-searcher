@@ -62,7 +62,7 @@ func main() {
 	var wg sync.WaitGroup
 	for i := 0; i < cfg.Concurrency; i++ {
 		wg.Add(1)
-		go worker(urlChan, resultsChan, &wg, cfg, client, &processedCount, limiter)
+		go worker(urlChan, resultsChan, &wg, client, &processedCount, limiter)
 	}
 
 	done := make(chan bool)
@@ -123,7 +123,7 @@ func generateURLs(initialDomains, paths []string, cfg config.Config, urlChan cha
 	}
 }
 
-func worker(urls <-chan string, results chan<- result.Result, wg *sync.WaitGroup, cfg config.Config, client interface {
+func worker(urls <-chan string, results chan<- result.Result, wg *sync.WaitGroup, client interface {
 	MakeRequest(url string) result.Result
 }, processedCount *int64, limiter *rate.Limiter) {
 	defer wg.Done()
