@@ -98,24 +98,22 @@ or
 - `-base-paths`: File containing list of base paths for additional URL generation (optional) (e.g., "..;/" - it should
   be one per line and end with "/")
 - `-concurrency`: Number of concurrent requests (default: 10)
-- `-use-fasthttp`: Use fasthttp instead of net/http (default: false)
-- `-host-depth`: How many sub-subdomains to use for path generation (e.g., 2 = test1-abc & test2 [based on test1-abc.test2.test3.example.com])
 - `-timeout`: Timeout for each request (default: 12s)
 - `-verbose`: Enable verbose output
+- `-headers`: Extra headers to add to each request (format: 'Header1:Value1,Header2:Value2')
+- `-proxy`: Proxy URL (e.g., http://127.0.0.1:8080)
+- `-max-content-read`: Maximum size of content to read for marker checking, in bytes (default: 5242880)
 - `-force-http`: Force HTTP (instead of HTTPS) requests (default: false)
+- `-use-fasthttp`: Use fasthttp instead of net/http (default: false)
+- `-host-depth`: How many sub-subdomains to use for path generation (e.g., 2 = test1-abc & test2 [based on test1-abc.test2.test3.example.com])
 - `-dont-generate-paths`: Don't generate paths based on host structure (default: false)
 - `-dont-append-envs`: Prevent appending environment variables to requests (-qa, ...) (default: false)
 - `-append-bypasses-to-words`: Append bypasses to words (admin -> admin; -> admin..;) (default: false)
-- `-show-fetch-timeout-errors`: Shows fetch timeout errors - this is useful when scanning for large files. (default:
-  false)
-- `-min-content-size`: Minimum file size to detect, in bytes (default: 0)
-- `-max-content-size`: Maximum size of content to read for marker checking, in bytes (default: 5242880)
-- `-status`: HTTP status code to filter (default: 200)
-- `-headers`: Extra headers to add to each request (format: 'Header1:Value1,Header2:Value2')
-- `-proxy`: Proxy URL (e.g., http://127.0.0.1:8080)
-- `-content-type`: Content type to filter (default: all)
-- `-disallowed-content-type`: Content-Type header value to filter out (csv allowed, e.g. json,octet)
-- `-disallowed-content-string`: Content-Type header value to filter out (csv allowed, e.g. json,octet)
+- `-min-content-size`: Minimum file size to consider, in bytes (default: 0)
+- `-http-status`: HTTP status code to filter (default: all)
+- `-content-types`: Content type to filter(csv allowed, e.g. json,octet)
+- `-disallowed-content-types`: Content-Type header value to filter out (csv allowed, e.g. json,octet)
+- `-disallowed-content-strings`: Content-Type header value to filter out (csv allowed, e.g. '<html>,<body>')
 
 ### Examples
 
@@ -136,12 +134,12 @@ or
 
 4. Scan for large files (>5MB) with content type JSON:
    ```
-   ./dynamic_file_searcher -domains domains.txt -paths paths.txt -min-size 5000000 -content-type json
+   ./dynamic_file_searcher -domains domains.txt -paths paths.txt -min-content-size 5000000 -content-types json -http-status 200 
    ```
 
 5. Targeted scan through a proxy with custom headers:
    ```
-   ./dynamic_file_searcher -domain example.com -paths paths.txt -markers markers.txt -proxy http://127.0.0.1:8080 -status 403 -headers "User-Agent:CustomBot/1.0"
+   ./dynamic_file_searcher -domain example.com -paths paths.txt -markers markers.txt -proxy http://127.0.0.1:8080-headers "User-Agent:CustomBot/1.0"
    ```
 
 6. Verbose output with custom timeout:
@@ -197,13 +195,16 @@ append `admin;` and `admin..;` etc. to the word. This is useful for bypassing fi
    set of URLs to scan.
 6. Concurrent workers send HTTP GET requests to these URLs.
 7. For each response:
-    - The tool reads up to `max-content-size` bytes for marker checking.
+    - The tool reads up to `max-content-read` bytes for marker checking.
     - It determines the full file size by reading (and discarding) the remaining content.
     - The response is analyzed based on:
         * Presence of specified content markers in the read portion (if markers are provided)
-        * Total file size (compared against `min-size`)
-        * Content type (if specified)
+        * OR -->
+        * Total file size (compared against `min-content-size`)
+        * Content types (if specified) + Disallowed content types (if specified)
+        * Disallowed content strings (if specified)
         * HTTP status code
+        * Important: These rules are not applied to marker based checks
 8. Results are reported in real-time, with a progress bar indicating overall completion.
 
 This approach allows for efficient scanning of both small and large files, balancing thorough marker checking with

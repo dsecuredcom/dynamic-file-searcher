@@ -52,7 +52,7 @@ func (c *Client) MakeRequest(url string) result.Result {
 	req.Header.SetMethod(fasthttp.MethodGet)
 	req.Header.Set("Connection", "keep-alive")
 	req.Header.SetProtocol("HTTP/1.1")
-	req.Header.Set("Range", fmt.Sprintf("bytes=0-%d", c.config.MaxContentSize-1))
+	req.Header.Set("Range", fmt.Sprintf("bytes=0-%d", c.config.MaxContentRead-1))
 
 	randomizeRequest(req)
 	for key, value := range c.config.ExtraHeaders {
@@ -92,8 +92,8 @@ func (c *Client) MakeRequest(url string) result.Result {
 		totalSize = int64(len(body))
 	}
 
-	if int64(len(body)) > c.config.MaxContentSize {
-		body = body[:c.config.MaxContentSize]
+	if int64(len(body)) > c.config.MaxContentRead {
+		body = body[:c.config.MaxContentRead]
 	}
 
 	return result.Result{

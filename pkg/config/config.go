@@ -29,7 +29,7 @@ type Config struct {
 	DontGeneratePaths        bool
 	NoEnvAppending           bool
 	MinContentSize           int64
-	MaxContentSize           int64
+	MaxContentRead           int64
 	HTTPStatusCode           int
 	ContentTypes             string
 	DisallowedContentTypes   string
@@ -58,8 +58,8 @@ func ParseFlags() Config {
 	flag.StringVar(&cfg.DisallowedContentStrings, "disallowed-content-strings", "", "If this string is present in the response body, the request will be considered as inrelevant (csv allowed, e.g. '<html>,<body>'")
 	flag.StringVar(&cfg.DisallowedContentTypes, "disallowed-content-types", "", "Content-Type header value to filter out (csv allowed, e.g. json,octet)")
 	flag.Int64Var(&cfg.MinContentSize, "min-content-size", 0, "Minimum file size to detect (in bytes)")
-	flag.Int64Var(&cfg.MaxContentSize, "max-content-size", 5*1024*1024, "Maximum size of content to read for marker checking (in bytes)")
-	flag.IntVar(&cfg.HTTPStatusCode, "status", 0, "HTTP status code to filter")
+	flag.Int64Var(&cfg.MaxContentRead, "max-content-read", 5*1024*1024, "Maximum size of content to read for marker checking (in bytes)")
+	flag.IntVar(&cfg.HTTPStatusCode, "http-status", 0, "HTTP status code to filter")
 
 	var proxyURLStr string
 	flag.StringVar(&proxyURLStr, "proxy", "", "Proxy URL (e.g., http://127.0.0.1:8080)")
