@@ -115,6 +115,7 @@ or
 - `-proxy`: Proxy URL (e.g., http://127.0.0.1:8080)
 - `-content-type`: Content type to filter (default: all)
 - `-disallowed-content-type`: Content-Type header value to filter out (csv allowed, e.g. json,octet)
+- `-disallowed-content-string`: Content-Type header value to filter out (csv allowed, e.g. json,octet)
 
 ### Examples
 

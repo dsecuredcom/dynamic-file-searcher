@@ -52,7 +52,7 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		rulesCount++
 	}
 
-	if cfg.ContentType != "" {
+	if cfg.ContentTypes != "" {
 		rulesCount++
 	}
 
@@ -66,8 +66,8 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		rulesMatched++
 	}
 
-	if cfg.ContentType != "" {
-		AllowedContentTypes := strings.ToLower(cfg.ContentType)
+	if cfg.ContentTypes != "" {
+		AllowedContentTypes := strings.ToLower(cfg.ContentTypes)
 		AllowedContentTypesList := strings.Split(AllowedContentTypes, ",")
 		ResultContentType := strings.ToLower(result.ContentType)
 		for _, AllowedContentTypeString := range AllowedContentTypesList {
@@ -78,10 +78,17 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		}
 	}
 
-	DisallowedContentTypes := strings.ToLower(cfg.DisallowedContentType)
+	DisallowedContentTypes := strings.ToLower(cfg.DisallowedContentTypes)
 	DisallowedContentTypesList := strings.Split(DisallowedContentTypes, ",")
 
 	if isDisallowedContentType(result.ContentType, DisallowedContentTypesList) {
+		return
+	}
+
+	DisallowedContentStrings := strings.ToLower(cfg.DisallowedContentStrings)
+	DisallowedContentStringsList := strings.Split(DisallowedContentStrings, ",")
+
+	if containsDisallowedStringInContent(result.Content, DisallowedContentStringsList) {
 		return
 	}
 
@@ -98,6 +105,24 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		log.Printf("Processed: %s (Status: %d, Size: %d bytes, Type: %s)\n",
 			result.URL, result.StatusCode, result.FileSize, result.ContentType)
 	}
+}
+
+func containsDisallowedStringInContent(contentBody string, DisallowedContentStringsList []string) bool {
+	if len(DisallowedContentStringsList) == 0 {
+		return false
+	}
+
+	for _, disallowedContentString := range DisallowedContentStringsList {
+		if disallowedContentString == "" {
+			continue
+		}
+
+		if strings.Contains(contentBody, disallowedContentString) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func isDisallowedContentType(contentType string, DisallowedContentTypesList []string) bool {
