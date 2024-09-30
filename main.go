@@ -95,7 +95,7 @@ func validateInput(initialDomains, paths, markers []string) {
 func printInitialInfo(cfg config.Config, initialDomains, paths []string) {
 
 	color.Cyan("[i] Scanning %d domains with %d paths", len(initialDomains), len(paths))
-	color.Cyan("[i] Minimum file size to detect: %d bytes", cfg.MinFileSize)
+	color.Cyan("[i] Minimum file size to detect: %d bytes", cfg.MinContentSize)
 	color.Cyan("[i] Filtering for HTTP status code: %d", cfg.HTTPStatusCode)
 
 	if len(cfg.ExtraHeaders) > 0 {

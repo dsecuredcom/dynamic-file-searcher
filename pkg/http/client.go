@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/fatih/color"
 	"io"
 	"math/rand"
 	"net/http"
@@ -78,9 +77,6 @@ func (c *Client) MakeRequest(url string) result.Result {
 	req.Header.Set("Range", fmt.Sprintf("bytes=0-%d", c.config.MaxContentSize-1))
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
-		if c.config.ShowFetchTimeoutErrors && strings.Contains(err.Error(), "context deadline exceeded") {
-			color.Red("\n[!]\tTimeout based detection: 'Url: %s Error: %s", url, err)
-		}
 		return result.Result{URL: url, Error: fmt.Errorf("error fetching: %w", err)}
 	}
 	defer resp.Body.Close()

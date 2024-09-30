@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/config"
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/result"
-	"github.com/fatih/color"
 	"github.com/valyala/fasthttp"
 	"math/rand"
 	"strconv"
@@ -77,10 +76,6 @@ func (c *Client) MakeRequest(url string) result.Result {
 	}
 
 	if err != nil {
-		if c.config.ShowFetchTimeoutErrors && err == fasthttp.ErrTimeout {
-			color.Red("\n[!]\tTimeout based detection: 'Url: %s Error: %s", url, err)
-		}
-
 		return result.Result{URL: url, Error: fmt.Errorf("error fetching: %w", err)}
 	}
 

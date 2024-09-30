@@ -48,7 +48,7 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		rulesCount++
 	}
 
-	if cfg.MinFileSize > 0 {
+	if cfg.MinContentSize > 0 {
 		rulesCount++
 	}
 
@@ -62,7 +62,7 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		rulesMatched++
 	}
 
-	if cfg.MinFileSize > 0 && result.FileSize >= cfg.MinFileSize {
+	if cfg.MinContentSize > 0 && result.FileSize >= cfg.MinContentSize {
 		rulesMatched++
 	}
 

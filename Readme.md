@@ -108,7 +108,7 @@ or
 - `-append-bypasses-to-words`: Append bypasses to words (admin -> admin; -> admin..;) (default: false)
 - `-show-fetch-timeout-errors`: Shows fetch timeout errors - this is useful when scanning for large files. (default:
   false)
-- `-min-size`: Minimum file size to detect, in bytes (default: 0)
+- `-min-content-size`: Minimum file size to detect, in bytes (default: 0)
 - `-max-content-size`: Maximum size of content to read for marker checking, in bytes (default: 5242880)
 - `-status`: HTTP status code to filter (default: 200)
 - `-headers`: Extra headers to add to each request (format: 'Header1:Value1,Header2:Value2')

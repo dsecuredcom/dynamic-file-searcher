@@ -17,23 +17,22 @@ type Config struct {
 	MarkersFile              string
 	BasePathsFile            string
 	Concurrency              int
-	HostDepth                int
 	Timeout                  time.Duration
 	Verbose                  bool
 	ProxyURL                 *url.URL
 	ExtraHeaders             map[string]string
-	MinFileSize              int64
+	FastHTTP                 bool
+	ForceHTTPProt            bool
+	HostDepth                int
+	AppendByPassesToWords    bool
+	BasePaths                []string
+	DontGeneratePaths        bool
+	NoEnvAppending           bool
+	MinContentSize           int64
 	MaxContentSize           int64
 	HTTPStatusCode           int
 	ContentTypes             string
 	DisallowedContentTypes   string
-	AppendByPassesToWords    bool
-	BasePaths                []string
-	DontGeneratePaths        bool
-	FastHTTP                 bool
-	NoEnvAppending           bool
-	ShowFetchTimeoutErrors   bool
-	ForceHTTPProt            bool
 	DisallowedContentStrings string
 }
 
@@ -55,13 +54,12 @@ func ParseFlags() Config {
 	flag.BoolVar(&cfg.FastHTTP, "use-fasthttp", false, "Use fasthttp instead of net/http")
 	flag.BoolVar(&cfg.ForceHTTPProt, "force-http", false, "Force the usage of http:// instead of https://")
 	flag.BoolVar(&cfg.NoEnvAppending, "dont-append-envs", false, "Prevent appending environment variables to requests (-qa, ...)")
-	flag.BoolVar(&cfg.ShowFetchTimeoutErrors, "show-fetch-timeout-errors", false, "Shows fetch timeout errors - this is useful when scanning for large files.")
 	flag.StringVar(&cfg.ContentTypes, "content-types", "", "Content-Type header values to filter (csv allowed, e.g. json,octet)")
 	flag.StringVar(&cfg.DisallowedContentStrings, "disallowed-content-strings", "", "If this string is present in the response body, the request will be considered as inrelevant (csv allowed, e.g. '<html>,<body>'")
 	flag.StringVar(&cfg.DisallowedContentTypes, "disallowed-content-types", "", "Content-Type header value to filter out (csv allowed, e.g. json,octet)")
-	flag.Int64Var(&cfg.MinFileSize, "min-size", 0, "Minimum file size to detect (in bytes)")
+	flag.Int64Var(&cfg.MinContentSize, "min-content-size", 0, "Minimum file size to detect (in bytes)")
 	flag.Int64Var(&cfg.MaxContentSize, "max-content-size", 5*1024*1024, "Maximum size of content to read for marker checking (in bytes)")
-	flag.IntVar(&cfg.HTTPStatusCode, "status", 200, "HTTP status code to filter")
+	flag.IntVar(&cfg.HTTPStatusCode, "status", 0, "HTTP status code to filter")
 
 	var proxyURLStr string
 	flag.StringVar(&proxyURLStr, "proxy", "", "Proxy URL (e.g., http://127.0.0.1:8080)")
