@@ -227,6 +227,9 @@ func GetDomains(domainsFile, singleDomain string) []string {
 				validDomains = append(validDomains, trimmedLine)
 			}
 		}
+
+		validDomains = utils.ShuffleStrings(validDomains)
+
 		return validDomains
 	}
 	return []string{singleDomain}
@@ -297,7 +300,7 @@ func GenerateURLs(domains, paths []string, cfg *config.Config) ([]string, int) {
 		}
 	}
 
-	utils.ShuffleStrings(allURLs)
+	allURLs = utils.ShuffleStrings(allURLs)
 
 	return allURLs, len(domainProtocols)
 }
