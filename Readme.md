@@ -110,7 +110,7 @@ or
 - `-dont-append-envs`: Prevent appending environment variables to requests (-qa, ...) (default: false)
 - `-append-bypasses-to-words`: Append bypasses to words (admin -> admin; -> admin..;) (default: false)
 - `-min-content-size`: Minimum file size to consider, in bytes (default: 0)
-- `-http-status`: HTTP status code to filter (default: all)
+- `-http-statuses`: HTTP status code to filter (default: all)
 - `-content-types`: Content type to filter(csv allowed, e.g. json,octet)
 - `-disallowed-content-types`: Content-Type header value to filter out (csv allowed, e.g. json,octet)
 - `-disallowed-content-strings`: Content-Type header value to filter out (csv allowed, e.g. '<html>,<body>')
@@ -134,7 +134,7 @@ or
 
 4. Scan for large files (>5MB) with content type JSON:
    ```
-   ./dynamic_file_searcher -domains domains.txt -paths paths.txt -min-content-size 5000000 -content-types json -http-status 200 
+   ./dynamic_file_searcher -domains domains.txt -paths paths.txt -min-content-size 5000000 -content-types json -http-statuses 200,206
    ```
 
 5. Targeted scan through a proxy with custom headers:
