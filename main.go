@@ -101,7 +101,7 @@ func printInitialInfo(cfg config.Config, initialDomains, paths []string) {
 
 	color.Cyan("[i] Scanning %d domains with %d paths", len(initialDomains), len(paths))
 	color.Cyan("[i] Minimum file size to detect: %d bytes", cfg.MinContentSize)
-	color.Cyan("[i] Filtering for HTTP status code: %d", cfg.HTTPStatusCode)
+	color.Cyan("[i] Filtering for HTTP status code: %s", cfg.HTTPStatusCodes)
 
 	if len(cfg.ExtraHeaders) > 0 {
 		color.Cyan("[i] Using extra headers:")

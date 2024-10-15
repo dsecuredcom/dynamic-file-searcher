@@ -4,6 +4,7 @@ import (
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/config"
 	"github.com/fatih/color"
 	"log"
+	"strconv"
 	"strings"
 )
 
@@ -44,7 +45,7 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 
 	rulesCount := 0
 
-	if cfg.HTTPStatusCode > 0 {
+	if cfg.HTTPStatusCodes != "" {
 		rulesCount++
 	}
 
@@ -58,8 +59,19 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 
 	rulesMatched := 0
 
-	if result.StatusCode == cfg.HTTPStatusCode {
-		rulesMatched++
+	if cfg.HTTPStatusCodes != "" {
+		AllowedHttpStatusesList := strings.Split(cfg.HTTPStatusCodes, ",")
+		for _, AllowedHttpStatusString := range AllowedHttpStatusesList {
+			allowedStatus, err := strconv.Atoi(strings.TrimSpace(AllowedHttpStatusString))
+			if err != nil {
+				log.Printf("Error converting status code '%s' to integer: %v", AllowedHttpStatusString, err)
+				continue
+			}
+			if result.StatusCode == allowedStatus {
+				rulesMatched++
+				break
+			}
+		}
 	}
 
 	if cfg.MinContentSize > 0 && result.FileSize >= cfg.MinContentSize {

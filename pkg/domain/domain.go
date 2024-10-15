@@ -62,6 +62,16 @@ var commonTLDs = []string{
 
 func splitDomain(host string, cfg *config.Config) []string {
 
+	if strings.HasPrefix(host, "http://") {
+		host = strings.TrimPrefix(host, "http://")
+	}
+
+	if strings.HasPrefix(host, "https://") {
+		host = strings.TrimPrefix(host, "https://")
+	}
+
+	host = strings.Split(host, "/")[0]
+
 	if ipv4Regex.MatchString(host) || ipv6Regex.MatchString(host) {
 		return []string{}
 	}
@@ -217,6 +227,9 @@ func GetDomains(domainsFile, singleDomain string) []string {
 				validDomains = append(validDomains, trimmedLine)
 			}
 		}
+
+		validDomains = utils.ShuffleStrings(validDomains)
+
 		return validDomains
 	}
 	return []string{singleDomain}
@@ -226,11 +239,27 @@ func GenerateURLs(domains, paths []string, cfg *config.Config) ([]string, int) {
 	var domainProtocols []domainProtocol
 
 	var proto = "https"
-	if cfg.ForceHTTPProt {
-		proto = "http"
-	}
 
 	for _, d := range domains {
+
+		if cfg.ForceHTTPProt {
+			proto = "http"
+		} else {
+			proto = "https"
+		}
+
+		if strings.HasPrefix(d, "http://") {
+			proto = "http"
+			d = strings.TrimPrefix(d, "http://")
+		}
+
+		if strings.HasPrefix(d, "https://") {
+			proto = "https"
+			d = strings.TrimPrefix(d, "https://")
+		}
+
+		d = strings.TrimSuffix(d, "/")
+
 		domainProtocols = append(domainProtocols, domainProtocol{domain: d, protocol: proto})
 	}
 
@@ -273,7 +302,7 @@ func GenerateURLs(domains, paths []string, cfg *config.Config) ([]string, int) {
 		}
 	}
 
-	utils.ShuffleStrings(allURLs)
+	allURLs = utils.ShuffleStrings(allURLs)
 
 	return allURLs, len(domainProtocols)
 }

@@ -27,9 +27,10 @@ func ReadLines(filename string) []string {
 	return lines
 }
 
-func ShuffleStrings(slice []string) {
+func ShuffleStrings(slice []string) []string {
 	for i := len(slice) - 1; i > 0; i-- {
 		j := rand.Intn(i + 1)
 		slice[i], slice[j] = slice[j], slice[i]
 	}
+	return slice
 }
