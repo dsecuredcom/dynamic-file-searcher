@@ -243,7 +243,9 @@ func GenerateURLs(domains, paths []string, cfg *config.Config) ([]string, int) {
 				continue
 			}
 
-			allURLs = append(allURLs, fmt.Sprintf("%s://%s/%s", dp.protocol, dp.domain, path))
+			if cfg.SkipRootFolderCheck == false {
+				allURLs = append(allURLs, fmt.Sprintf("%s://%s/%s", dp.protocol, dp.domain, path))
+			}
 
 			if len(cfg.BasePaths) > 0 {
 				for _, basePath := range cfg.BasePaths {

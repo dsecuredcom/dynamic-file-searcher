@@ -25,6 +25,7 @@ type Config struct {
 	ForceHTTPProt            bool
 	HostDepth                int
 	AppendByPassesToWords    bool
+	SkipRootFolderCheck      bool
 	BasePaths                []string
 	DontGeneratePaths        bool
 	NoEnvAppending           bool
@@ -50,6 +51,7 @@ func ParseFlags() Config {
 	flag.BoolVar(&cfg.DontGeneratePaths, "dont-generate-paths", false, "If true, only the base paths (or nothing) will be used for scanning")
 	flag.DurationVar(&cfg.Timeout, "timeout", 12*time.Second, "Timeout for each request")
 	flag.BoolVar(&cfg.Verbose, "verbose", false, "Verbose output")
+	flag.BoolVar(&cfg.SkipRootFolderCheck, "skip-root-folder-check", false, "Prevents checking https://domain/PATH")
 	flag.BoolVar(&cfg.AppendByPassesToWords, "append-bypasses-to-words", false, "Append bypasses to words (admin -> admin; -> admin..;)")
 	flag.BoolVar(&cfg.FastHTTP, "use-fasthttp", false, "Use fasthttp instead of net/http")
 	flag.BoolVar(&cfg.ForceHTTPProt, "force-http", false, "Force the usage of http:// instead of https://")
