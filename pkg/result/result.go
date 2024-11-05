@@ -4,6 +4,7 @@ import (
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/config"
 	"github.com/fatih/color"
 	"log"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -27,7 +28,7 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 
 	markerFound := false
 	for _, marker := range markers {
-		if strings.Contains(result.Content, marker) {
+		if strings.HasPrefix(marker, "regex:") == false && strings.Contains(result.Content, marker) {
 			color.Red("\n[!]\tFound marker '%s' in %s", marker, result.URL)
 			if len(result.Content) > 150 {
 				color.Green("\n[!]\tBody: %s\n", result.Content[:150])
@@ -36,6 +37,21 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 			}
 			markerFound = true
 			break
+		}
+
+		if strings.HasPrefix(marker, "regex:") {
+			regex := strings.TrimPrefix(marker, "regex:")
+
+			if match, _ := regexp.MatchString(regex, result.Content); match {
+				color.Red("\n[!]\tFound marker '%s' in %s", marker, result.URL)
+				if len(result.Content) > 150 {
+					color.Green("\n[!]\tBody: %s\n", result.Content[:150])
+				} else {
+					color.Green("\n[!]\tBody: %s\n", result.Content)
+				}
+				markerFound = true
+				break
+			}
 		}
 	}
 
