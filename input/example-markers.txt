@@ -1,2 +1,3 @@
 secret-string-1
 super-important-string-to-match
+regex:\"\s?:\s?\"[a-z0-9\.-_]+\@[a-zA-Z0-9\.-_]+\.[a-z]{2,10}\"
