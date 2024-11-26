@@ -42,11 +42,13 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 
 	markerFound := false
 	hasMarkers := len(markers) > 0
+	usedMarker := ""
 
 	if hasMarkers {
 		for _, marker := range markers {
 			if strings.HasPrefix(marker, "regex:") == false && strings.Contains(result.Content, marker) {
 				markerFound = true
+				usedMarker = marker
 				break
 			}
 
@@ -54,6 +56,7 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 				regex := strings.TrimPrefix(marker, "regex:")
 				if match, _ := regexp.MatchString(regex, result.Content); match {
 					markerFound = true
+					usedMarker = marker
 					break
 				}
 			}
@@ -124,16 +127,19 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 	// If we get here, all configured conditions were met
 	color.Red("\n[!]\tMatch found in %s", result.URL)
 	if hasMarkers {
-		color.Red("\tMarkers check: passed")
+		color.Red("\tMarkers check: passed (%s)", usedMarker)
 	}
-	if rulesCount > 0 {
-		color.Red("\tRules check: passed (S: %d, FS: %d, CT: %s)",
-			result.StatusCode, result.FileSize, result.ContentType)
-	}
-	if len(result.Content) > 150 {
-		color.Green("\n[!]\tBody: %s\n", result.Content[:150])
+
+	color.Red("\tRules check: passed (S: %d, FS: %d, CT: %s)",
+		result.StatusCode, result.FileSize, result.ContentType)
+
+	content := result.Content
+	content = strings.ReplaceAll(content, "\n", "")
+
+	if len(content) > 150 {
+		color.Green("\n[!]\tBody: %s\n", content[:150])
 	} else {
-		color.Green("\n[!]\tBody: %s\n", result.Content)
+		color.Green("\n[!]\tBody: %s\n", content)
 	}
 
 	if cfg.Verbose {
