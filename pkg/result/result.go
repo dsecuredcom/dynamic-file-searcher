@@ -26,39 +26,41 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		return
 	}
 
-	markerFound := false
-	for _, marker := range markers {
-		if strings.HasPrefix(marker, "regex:") == false && strings.Contains(result.Content, marker) {
-			color.Red("\n[!]\tFound marker '%s' in %s", marker, result.URL)
-			if len(result.Content) > 150 {
-				color.Green("\n[!]\tBody: %s\n", result.Content[:150])
-			} else {
-				color.Green("\n[!]\tBody: %s\n", result.Content)
-			}
-			markerFound = true
-			break
-		}
-
-		if strings.HasPrefix(marker, "regex:") {
-			regex := strings.TrimPrefix(marker, "regex:")
-
-			if match, _ := regexp.MatchString(regex, result.Content); match {
-				color.Red("\n[!]\tFound marker '%s' in %s", marker, result.URL)
-				if len(result.Content) > 150 {
-					color.Green("\n[!]\tBody: %s\n", result.Content[:150])
-				} else {
-					color.Green("\n[!]\tBody: %s\n", result.Content)
-				}
-				markerFound = true
-				break
-			}
-		}
-	}
-
-	if markerFound {
+	// Check if content type is disallowed first
+	DisallowedContentTypes := strings.ToLower(cfg.DisallowedContentTypes)
+	DisallowedContentTypesList := strings.Split(DisallowedContentTypes, ",")
+	if isDisallowedContentType(result.ContentType, DisallowedContentTypesList) {
 		return
 	}
 
+	// Check if content contains disallowed strings
+	DisallowedContentStrings := strings.ToLower(cfg.DisallowedContentStrings)
+	DisallowedContentStringsList := strings.Split(DisallowedContentStrings, ",")
+	if containsDisallowedStringInContent(result.Content, DisallowedContentStringsList) {
+		return
+	}
+
+	markerFound := false
+	hasMarkers := len(markers) > 0
+
+	if hasMarkers {
+		for _, marker := range markers {
+			if strings.HasPrefix(marker, "regex:") == false && strings.Contains(result.Content, marker) {
+				markerFound = true
+				break
+			}
+
+			if strings.HasPrefix(marker, "regex:") {
+				regex := strings.TrimPrefix(marker, "regex:")
+				if match, _ := regexp.MatchString(regex, result.Content); match {
+					markerFound = true
+					break
+				}
+			}
+		}
+	}
+
+	rulesMatched := 0
 	rulesCount := 0
 
 	if cfg.HTTPStatusCodes != "" {
@@ -72,8 +74,6 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 	if cfg.ContentTypes != "" {
 		rulesCount++
 	}
-
-	rulesMatched := 0
 
 	if cfg.HTTPStatusCodes != "" {
 		AllowedHttpStatusesList := strings.Split(cfg.HTTPStatusCodes, ",")
@@ -90,10 +90,12 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		}
 	}
 
+	// Check content size
 	if cfg.MinContentSize > 0 && result.FileSize >= cfg.MinContentSize {
 		rulesMatched++
 	}
 
+	// Check content types
 	if cfg.ContentTypes != "" {
 		AllowedContentTypes := strings.ToLower(cfg.ContentTypes)
 		AllowedContentTypesList := strings.Split(AllowedContentTypes, ",")
@@ -106,30 +108,35 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		}
 	}
 
-	DisallowedContentTypes := strings.ToLower(cfg.DisallowedContentTypes)
-	DisallowedContentTypesList := strings.Split(DisallowedContentTypes, ",")
+	// Determine if rules match
+	rulesPass := rulesCount == 0 || (rulesCount > 0 && rulesMatched == rulesCount)
 
-	if isDisallowedContentType(result.ContentType, DisallowedContentTypesList) {
-		return
-	}
-
-	DisallowedContentStrings := strings.ToLower(cfg.DisallowedContentStrings)
-	DisallowedContentStringsList := strings.Split(DisallowedContentStrings, ",")
-
-	if containsDisallowedStringInContent(result.Content, DisallowedContentStringsList) {
-		return
-	}
-
-	if rulesCount > 0 && rulesMatched == rulesCount {
-		color.Red("\n[!]\tFound based on rules: 'S: %d, FS: %d', CT: %s in %s", result.StatusCode, result.FileSize, result.ContentType, result.URL)
-		if len(result.Content) > 150 {
-			color.Green("\n[!]\tBody: %s\n", result.Content[:150])
-		} else {
-			color.Green("\n[!]\tBody: %s\n", result.Content)
+	// Final decision based on both markers and rules
+	if (hasMarkers && !markerFound) || (rulesCount > 0 && !rulesPass) {
+		// If we have markers but didn't find one, OR if we have rules but they didn't pass, skip
+		if cfg.Verbose {
+			log.Printf("Skipped: %s (Status: %d, Size: %d bytes, Type: %s)\n",
+				result.URL, result.StatusCode, result.FileSize, result.ContentType)
 		}
+		return
 	}
 
-	if cfg.Verbose && !markerFound {
+	// If we get here, all configured conditions were met
+	color.Red("\n[!]\tMatch found in %s", result.URL)
+	if hasMarkers {
+		color.Red("\tMarkers check: passed")
+	}
+	if rulesCount > 0 {
+		color.Red("\tRules check: passed (S: %d, FS: %d, CT: %s)",
+			result.StatusCode, result.FileSize, result.ContentType)
+	}
+	if len(result.Content) > 150 {
+		color.Green("\n[!]\tBody: %s\n", result.Content[:150])
+	} else {
+		color.Green("\n[!]\tBody: %s\n", result.Content)
+	}
+
+	if cfg.Verbose {
 		log.Printf("Processed: %s (Status: %d, Size: %d bytes, Type: %s)\n",
 			result.URL, result.StatusCode, result.FileSize, result.ContentType)
 	}

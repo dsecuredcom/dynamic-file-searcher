@@ -61,7 +61,7 @@ func ParseFlags() Config {
 	flag.StringVar(&cfg.DisallowedContentTypes, "disallowed-content-types", "", "Content-Type header value to filter out (csv allowed, e.g. json,octet)")
 	flag.Int64Var(&cfg.MinContentSize, "min-content-size", 0, "Minimum file size to detect (in bytes)")
 	flag.Int64Var(&cfg.MaxContentRead, "max-content-read", 5*1024*1024, "Maximum size of content to read for marker checking (in bytes)")
-	flag.StringVar(&cfg.HTTPStatusCodes, "http-status", "", "HTTP status code to filter (csv allowed)")
+	flag.StringVar(&cfg.HTTPStatusCodes, "http-statuses", "", "HTTP status code to filter (csv allowed)")
 
 	var proxyURLStr string
 	flag.StringVar(&proxyURLStr, "proxy", "", "Proxy URL (e.g., http://127.0.0.1:8080)")
