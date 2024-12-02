@@ -22,7 +22,7 @@ var (
 	onlyAlphaRegex    = regexp.MustCompile(`^[a-z]+$`)
 	suffixNumberRegex = regexp.MustCompile(`[\d]+$`)
 	envRegex          = regexp.MustCompile(`(prod|qa|dev|testing|test|uat|stg|stage|staging|developement|production)$`)
-	appendEnvList     = []string{"prod", "qa", "dev", "test", "uat", "stg", "stage"}
+	appendEnvList     = []string{"prod", "qa", "dev", "test", "uat", "stg", "stage", "sit"}
 	regionPartRegex   = regexp.MustCompile(`(us-east|us-west|af-south|ap-east|ap-south|ap-northeast|ap-southeast|ca-central|eu-west|eu-north|eu-south|me-south|sa-east|us-east-1|us-east-2|us-west-1|us-west-2|af-south-1|ap-east-1|ap-south-1|ap-northeast-3|ap-northeast-2|ap-southeast-1|ap-southeast-2|ap-southeast-3|ap-northeast-1|ca-central-1|eu-central-1|eu-west-1|eu-west-2|eu-west-3|eu-north-1|eu-south-1|me-south-1|sa-east-1|useast1|useast2|uswest1|uswest2|afsouth1|apeast1|apsouth1|apnortheast3|apnortheast2|apsoutheast1|apsoutheast2|apsoutheast3|apnortheast1|cacentral1|eucentral1|euwest1|euwest2|euwest3|eunorth1|eusouth1|mesouth1|saeast1)`)
 	byPassCharacters  = []string{";", "..;"}
 )
@@ -170,6 +170,21 @@ func splitDomain(host string, cfg *config.Config) []string {
 					result = append(result, part+"-"+env)
 				}
 			}
+		}
+
+		for _, part := range result {
+			// Skip base word when it is not alpha only
+			if onlyAlphaRegex.MatchString(part) == false {
+				continue
+			}
+
+			for _, env := range appendEnvList {
+				if strings.HasSuffix(part, env) {
+					result = append(result, strings.TrimSuffix(part, env))
+					break
+				}
+			}
+
 		}
 	}
 
