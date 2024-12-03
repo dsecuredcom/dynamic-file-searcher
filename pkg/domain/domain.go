@@ -96,6 +96,10 @@ func splitDomain(host string, cfg *config.Config) []string {
 	// Separate the host into parts
 	parts := strings.Split(host, ".")
 
+	// if first part is www, remove it:
+	if len(parts) > 0 && parts[0] == "www" {
+		parts = parts[1:]
+	}
 	// If the host depth is set, only take the first n parts
 	if cfg.HostDepth > 0 && len(parts) >= cfg.HostDepth {
 		parts = parts[:cfg.HostDepth]
@@ -171,7 +175,8 @@ func splitDomain(host string, cfg *config.Config) []string {
 				}
 			}
 		}
-
+	}
+	if cfg.EnvRemoving == true {
 		for _, part := range result {
 			// Skip base word when it is not alpha only
 			if onlyAlphaRegex.MatchString(part) == false {

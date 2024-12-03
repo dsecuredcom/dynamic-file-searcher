@@ -29,6 +29,7 @@ type Config struct {
 	BasePaths                []string
 	DontGeneratePaths        bool
 	NoEnvAppending           bool
+	EnvRemoving              bool
 	MinContentSize           int64
 	MaxContentRead           int64
 	HTTPStatusCodes          string
@@ -56,6 +57,7 @@ func ParseFlags() Config {
 	flag.BoolVar(&cfg.FastHTTP, "use-fasthttp", false, "Use fasthttp instead of net/http")
 	flag.BoolVar(&cfg.ForceHTTPProt, "force-http", false, "Force the usage of http:// instead of https://")
 	flag.BoolVar(&cfg.NoEnvAppending, "dont-append-envs", false, "Prevent appending environment variables to requests (-qa, ...)")
+	flag.BoolVar(&cfg.EnvRemoving, "remove-envs", true, "In case a word ends with a known envword, a variant without the envword will be added")
 	flag.StringVar(&cfg.ContentTypes, "content-types", "", "Content-Type header values to filter (csv allowed, e.g. json,octet)")
 	flag.StringVar(&cfg.DisallowedContentStrings, "disallowed-content-strings", "", "If this string is present in the response body, the request will be considered as inrelevant (csv allowed, e.g. '<html>,<body>'")
 	flag.StringVar(&cfg.DisallowedContentTypes, "disallowed-content-types", "", "Content-Type header value to filter out (csv allowed, e.g. json,octet)")
