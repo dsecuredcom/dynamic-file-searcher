@@ -50,7 +50,6 @@ func (c *Client) MakeRequest(url string) result.Result {
 	defer fasthttp.ReleaseRequest(req)
 
 	req.SetRequestURI(url)
-	req.Header.DisableNormalizing()
 	req.Header.SetMethod(fasthttp.MethodGet)
 	req.Header.Set("Connection", "keep-alive")
 	req.Header.SetProtocol("HTTP/1.1")
