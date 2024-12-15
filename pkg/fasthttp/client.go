@@ -48,8 +48,9 @@ func NewClient(cfg config.Config) *Client {
 func (c *Client) MakeRequest(url string) result.Result {
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
+
+	req.SetRequestURIBytes([]byte(url))
 	req.DisableRedirectPathNormalizing = true
-	req.SetRequestURI(url)
 	req.Header.SetMethod(fasthttp.MethodGet)
 	req.Header.Set("Connection", "keep-alive")
 	req.Header.SetProtocol("HTTP/1.1")
