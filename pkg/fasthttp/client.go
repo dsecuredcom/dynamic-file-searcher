@@ -36,6 +36,7 @@ func NewClient(cfg config.Config) *Client {
 		client: &fasthttp.Client{
 			ReadTimeout:                   cfg.Timeout,
 			WriteTimeout:                  cfg.Timeout,
+			DisablePathNormalizing:        true,
 			DisableHeaderNamesNormalizing: true, // Prevent automatic header modifications
 			TLSConfig: &tls.Config{
 				InsecureSkipVerify: true,
@@ -63,8 +64,9 @@ func (c *Client) MakeRequest(url string) result.Result {
 	defer fasthttp.ReleaseResponse(resp)
 
 	client := &fasthttp.Client{
-		ReadTimeout:  c.config.Timeout,
-		WriteTimeout: c.config.Timeout,
+		ReadTimeout:            c.config.Timeout,
+		WriteTimeout:           c.config.Timeout,
+		DisablePathNormalizing: true,
 		TLSConfig: &tls.Config{
 			InsecureSkipVerify: true,
 		},
