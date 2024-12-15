@@ -48,7 +48,7 @@ func NewClient(cfg config.Config) *Client {
 func (c *Client) MakeRequest(url string) result.Result {
 	req := fasthttp.AcquireRequest()
 	defer fasthttp.ReleaseRequest(req)
-
+	req.DisableRedirectPathNormalizing = true
 	req.SetRequestURI(url)
 	req.Header.SetMethod(fasthttp.MethodGet)
 	req.Header.Set("Connection", "keep-alive")
@@ -64,9 +64,10 @@ func (c *Client) MakeRequest(url string) result.Result {
 	defer fasthttp.ReleaseResponse(resp)
 
 	client := &fasthttp.Client{
-		ReadTimeout:            c.config.Timeout,
-		WriteTimeout:           c.config.Timeout,
-		DisablePathNormalizing: true,
+		ReadTimeout:                   c.config.Timeout,
+		WriteTimeout:                  c.config.Timeout,
+		DisableHeaderNamesNormalizing: true,
+		DisablePathNormalizing:        true,
 		TLSConfig: &tls.Config{
 			InsecureSkipVerify: true,
 		},
