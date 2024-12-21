@@ -37,13 +37,10 @@ func NewResponseMap() *ResponseMap {
 	return rm
 }
 
-// getShard verwendet die ersten 8 Bits des Hashes für das Sharding
 func (rm *ResponseMap) getShard(hash uint64) *responseShard {
 	return &rm.shards[hash&0xFF]
 }
 
-// computeHash erzeugt einen uint64 Hash aus Host und Size
-// Die ersten 48 Bits sind für den Host (FNV-1a), die letzten 16 für die Size
 func computeHash(host string, size int64) uint64 {
 	h := uint64(14695981039346656037) // FNV offset basis
 	for i := 0; i < len(host); i++ {
@@ -53,7 +50,6 @@ func computeHash(host string, size int64) uint64 {
 	return (h & 0xFFFFFFFFFFFF) | (uint64(size&0xFFFF) << 48)
 }
 
-// isNewResponse prüft effizient ob diese Kombination neu ist
 func (rm *ResponseMap) isNewResponse(host string, size int64) bool {
 	hash := computeHash(host, size)
 	shard := rm.getShard(hash)
@@ -76,7 +72,6 @@ func extractHost(urlStr string) string {
 	return parsedURL.Host
 }
 
-// Globale Instanz
 var tracker = NewResponseMap()
 
 func ProcessResult(result Result, cfg config.Config, markers []string) {
