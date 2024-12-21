@@ -4,9 +4,11 @@ import (
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/config"
 	"github.com/fatih/color"
 	"log"
+	"net/url"
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 )
 
 type Result struct {
@@ -17,6 +19,65 @@ type Result struct {
 	FileSize    int64
 	ContentType string
 }
+
+type ResponseMap struct {
+	shards [256]responseShard
+}
+
+type responseShard struct {
+	sync.RWMutex
+	responses map[uint64]struct{} // uint64 codiert host und size
+}
+
+func NewResponseMap() *ResponseMap {
+	rm := &ResponseMap{}
+	for i := range rm.shards {
+		rm.shards[i].responses = make(map[uint64]struct{})
+	}
+	return rm
+}
+
+// getShard verwendet die ersten 8 Bits des Hashes für das Sharding
+func (rm *ResponseMap) getShard(hash uint64) *responseShard {
+	return &rm.shards[hash&0xFF]
+}
+
+// computeHash erzeugt einen uint64 Hash aus Host und Size
+// Die ersten 48 Bits sind für den Host (FNV-1a), die letzten 16 für die Size
+func computeHash(host string, size int64) uint64 {
+	h := uint64(14695981039346656037) // FNV offset basis
+	for i := 0; i < len(host); i++ {
+		h ^= uint64(host[i])
+		h *= 1099511628211 // FNV prime
+	}
+	return (h & 0xFFFFFFFFFFFF) | (uint64(size&0xFFFF) << 48)
+}
+
+// isNewResponse prüft effizient ob diese Kombination neu ist
+func (rm *ResponseMap) isNewResponse(host string, size int64) bool {
+	hash := computeHash(host, size)
+	shard := rm.getShard(hash)
+
+	shard.Lock()
+	defer shard.Unlock()
+
+	if _, exists := shard.responses[hash]; exists {
+		return false
+	}
+	shard.responses[hash] = struct{}{}
+	return true
+}
+
+func extractHost(urlStr string) string {
+	parsedURL, err := url.Parse(urlStr)
+	if err != nil {
+		return urlStr // Return original if parsing fails
+	}
+	return parsedURL.Host
+}
+
+// Globale Instanz
+var tracker = NewResponseMap()
 
 func ProcessResult(result Result, cfg config.Config, markers []string) {
 	if result.Error != nil {
@@ -120,6 +181,15 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		if cfg.Verbose {
 			log.Printf("Skipped: %s (Status: %d, Size: %d bytes, Type: %s)\n",
 				result.URL, result.StatusCode, result.FileSize, result.ContentType)
+		}
+		return
+	}
+
+	host := extractHost(result.URL)
+
+	if !tracker.isNewResponse(host, result.FileSize) {
+		if cfg.Verbose {
+			log.Printf("Skipped duplicate response size %d for host %s\n", result.FileSize, host)
 		}
 		return
 	}
