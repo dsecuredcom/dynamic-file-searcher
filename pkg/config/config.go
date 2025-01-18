@@ -10,7 +10,7 @@ import (
 	"time"
 )
 
-var defaultAppendEnvList = []string{"prod", "qa", "dev", "test", "uat", "stg", "stage", "sit", "api"}
+var defaultAppendEnvList = []string{"prod", "dev", "test"}
 
 type Config struct {
 	DomainsFile              string
