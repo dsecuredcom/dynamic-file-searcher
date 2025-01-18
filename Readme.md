@@ -114,6 +114,7 @@ or
 - `-content-types`: Content type to filter(csv allowed, e.g. json,octet)
 - `-disallowed-content-types`: Content-Type header value to filter out (csv allowed, e.g. json,octet)
 - `-disallowed-content-strings`: Content-Type header value to filter out (csv allowed, e.g. '<html>,<body>')
+- `-env-append-words`: Comma-separated list of environment words to append (e.g., dev,prod,api). If not specified, defaults to: prod,qa,dev,test,uat,stg,stage,sit,api
 
 ### Examples
 
@@ -160,6 +161,7 @@ There are basically some very important flags that you should understand before 
 - `-dont-generate-paths`
 - `-dont-append-envs`
 - `-append-bypasses-to-words`
+- `-env-append-words`
 
 Given the following host structure: `housetodo.some-word.thisthat.example.com`
 
@@ -184,6 +186,24 @@ detects `housetodo` as a word, it will not append `-qa`, `-dev`, `-prod`, etc. t
 
 This flag is used to append bypasses to words. For example, if the tool detects `admin` as a word, it will
 append `admin;` and `admin..;` etc. to the word. This is useful for bypassing filters.
+
+### env-append-words
+This flag allows you to customize the list of environment words that will be appended to relevant words during path generation. 
+By default, the tool uses a predefined list: `prod,qa,dev,test,uat,stg,stage,sit,api`. 
+You can override this with your own comma-separated list of words.
+
+For example:
+
+`./dynamic_file_searcher -domain example.com -paths paths.txt -env-append-words "development,production,staging,beta"`
+
+This would generate paths like:
+- /housetodo-development
+- /housetodo-production
+- /housetodo-staging
+- /housetodo-beta
+
+Note that this flag only has an effect if `-dont-append-envs` is not set. 
+When `-dont-append-envs` is true, no environment words will be appended regardless of the `-env-append-words` value.
 
 ## How It Works
 

@@ -22,9 +22,9 @@ var (
 	onlyAlphaRegex    = regexp.MustCompile(`^[a-z]+$`)
 	suffixNumberRegex = regexp.MustCompile(`[\d]+$`)
 	envRegex          = regexp.MustCompile(`(prod|qa|dev|testing|test|uat|stg|stage|staging|developement|production)$`)
-	appendEnvList     = []string{"prod", "qa", "dev", "test", "uat", "stg", "stage", "sit", "api"}
-	regionPartRegex   = regexp.MustCompile(`(us-east|us-west|af-south|ap-east|ap-south|ap-northeast|ap-southeast|ca-central|eu-west|eu-north|eu-south|me-south|sa-east|us-east-1|us-east-2|us-west-1|us-west-2|af-south-1|ap-east-1|ap-south-1|ap-northeast-3|ap-northeast-2|ap-southeast-1|ap-southeast-2|ap-southeast-3|ap-northeast-1|ca-central-1|eu-central-1|eu-west-1|eu-west-2|eu-west-3|eu-north-1|eu-south-1|me-south-1|sa-east-1|useast1|useast2|uswest1|uswest2|afsouth1|apeast1|apsouth1|apnortheast3|apnortheast2|apsoutheast1|apsoutheast2|apsoutheast3|apnortheast1|cacentral1|eucentral1|euwest1|euwest2|euwest3|eunorth1|eusouth1|mesouth1|saeast1)`)
-	byPassCharacters  = []string{";", "..;"}
+	// Removed the hard-coded appendEnvList. Use cfg.AppendEnvList instead in splitDomain().
+	regionPartRegex  = regexp.MustCompile(`(us-east|us-west|af-south|ap-east|ap-south|ap-northeast|ap-southeast|ca-central|eu-west|eu-north|eu-south|me-south|sa-east|us-east-1|us-east-2|us-west-1|us-west-2|af-south-1|ap-east-1|ap-south-1|ap-northeast-3|ap-northeast-2|ap-southeast-1|ap-southeast-2|ap-southeast-3|ap-northeast-1|ca-central-1|eu-central-1|eu-west-1|eu-west-2|eu-west-3|eu-north-1|eu-south-1|me-south-1|sa-east-1|useast1|useast2|uswest1|uswest2|afsouth1|apeast1|apsouth1|apnortheast3|apnortheast2|apsoutheast1|apsoutheast2|apsoutheast3|apnortheast1|cacentral1|eucentral1|euwest1|euwest2|euwest3|eunorth1|eusouth1|mesouth1|saeast1)`)
+	byPassCharacters = []string{";", "..;"}
 )
 
 var commonTLDs = []string{
@@ -85,7 +85,7 @@ func splitDomain(host string, cfg *config.Config) []string {
 	host = md5Regex.ReplaceAllString(host, "")
 	// Remove the top level domain
 	host = removeTLD(host)
-	// Remove regional parts, those are usually not interesting (proof me wrong!)
+	// Remove regional parts, those are usually not interesting
 	host = regionPartRegex.ReplaceAllString(host, "")
 
 	// Standardize the relevant host part
@@ -100,15 +100,15 @@ func splitDomain(host string, cfg *config.Config) []string {
 	if len(parts) > 0 && parts[0] == "www" {
 		parts = parts[1:]
 	}
+
 	// If the host depth is set, only take the first n parts
 	if cfg.HostDepth > 0 && len(parts) >= cfg.HostDepth {
 		parts = parts[:cfg.HostDepth]
 	}
 
-	var relevantParts map[string]bool
-	relevantParts = make(map[string]bool)
+	// We use a map to avoid duplicates
+	relevantParts := make(map[string]bool)
 
-	// add all parts to the relevant parts
 	for i := 0; i < len(parts); i++ {
 		relevantParts[parts[i]] = true
 
@@ -124,7 +124,7 @@ func splitDomain(host string, cfg *config.Config) []string {
 
 	var result []string
 	for part := range relevantParts {
-		// Drop parts that are numbers
+		// Drop parts that are purely numeric
 		if _, err := strconv.Atoi(part); err == nil {
 			continue
 		}
@@ -139,7 +139,7 @@ func splitDomain(host string, cfg *config.Config) []string {
 			result = append(result, strings.ReplaceAll(part, envRegex.FindString(part), ""))
 		}
 
-		// If part ends with the numberPrefix, remove this numberPrefix and add the rest to results
+		// If part ends with a number, remove the numeric suffix and add the rest
 		if suffixNumberRegex.MatchString(part) {
 			result = append(result, strings.ReplaceAll(part, suffixNumberRegex.FindString(part), ""))
 		}
@@ -150,15 +150,14 @@ func splitDomain(host string, cfg *config.Config) []string {
 	// If appending env words is allowed, add them
 	if cfg.NoEnvAppending == false {
 		for _, part := range result {
-			// Skip base word when it is not alpha only
+			// Skip base word if it is not purely alpha
 			if onlyAlphaRegex.MatchString(part) == false {
 				continue
 			}
 
-			// Do some sanity checks, to prevent adding too many env words
+			// Some sanity checks to prevent adding too many env words
 			shouldBeAdded := true
-
-			for _, env := range appendEnvList {
+			for _, env := range cfg.AppendEnvList {
 				if strings.HasSuffix(part, env) {
 					shouldBeAdded = false
 					break
@@ -166,7 +165,8 @@ func splitDomain(host string, cfg *config.Config) []string {
 			}
 
 			if shouldBeAdded {
-				for _, env := range appendEnvList {
+				for _, env := range cfg.AppendEnvList {
+					// If part already *contains* env, skip
 					if strings.Contains(part, env) {
 						continue
 					}
@@ -176,59 +176,53 @@ func splitDomain(host string, cfg *config.Config) []string {
 			}
 		}
 	}
-	if cfg.EnvRemoving == true {
+
+	// If removing environment suffixes is enabled
+	if cfg.EnvRemoving {
 		for _, part := range result {
-			// Skip base word when it is not alpha only
-			if onlyAlphaRegex.MatchString(part) == false {
+			// Skip if not purely alpha
+			if !onlyAlphaRegex.MatchString(part) {
 				continue
 			}
-
-			for _, env := range appendEnvList {
+			// If the part ends with a known env word, produce a version with that suffix trimmed
+			for _, env := range cfg.AppendEnvList {
 				if strings.HasSuffix(part, env) {
 					result = append(result, strings.TrimSuffix(part, env))
 					break
 				}
 			}
-
 		}
 	}
 
-	// Cleaning, just in case I missed some edge cases
+	// Clean things up
 	for i := 0; i < len(result); i++ {
 		result[i] = strings.TrimRight(result[i], ".-_")
 		result[i] = strings.TrimLeft(result[i], ".-_")
 
 		if result[i] == "" {
 			result = append(result[:i], result[i+1:]...)
-			i-- // Adjust index since we've removed an element
+			i--
 		}
 	}
 
 	// Make list unique
 	result = makeUniqueList(result)
+
 	if cfg.AppendByPassesToWords {
 		for _, part := range result {
 			for _, bypass := range byPassCharacters {
-
 				result = append(result, part+bypass)
 			}
 		}
 	}
 
-	//fmt.Printf("\n")
-	//for _, part := range result {
-	//	fmt.Printf("%s\n", part)
-	//}
-	//
-	//syscall.Exit(1)
-
 	return result
 }
 
-func makeUniqueList(result []string) []string {
+func makeUniqueList(input []string) []string {
 	keys := make(map[string]bool)
 	list := []string{}
-	for _, entry := range result {
+	for _, entry := range input {
 		if _, value := keys[entry]; !value {
 			keys[entry] = true
 			list = append(list, entry)
@@ -247,9 +241,7 @@ func GetDomains(domainsFile, singleDomain string) []string {
 				validDomains = append(validDomains, trimmedLine)
 			}
 		}
-
 		validDomains = utils.ShuffleStrings(validDomains)
-
 		return validDomains
 	}
 	return []string{singleDomain}
@@ -261,7 +253,6 @@ func GenerateURLs(domains, paths []string, cfg *config.Config) ([]string, int) {
 	var proto = "https"
 
 	for _, d := range domains {
-
 		if cfg.ForceHTTPProt {
 			proto = "http"
 		} else {
@@ -284,25 +275,20 @@ func GenerateURLs(domains, paths []string, cfg *config.Config) ([]string, int) {
 	}
 
 	var allURLs []string
-
 	for _, dp := range domainProtocols {
 		for _, path := range paths {
-
 			if strings.HasPrefix(path, "##") {
 				continue
 			}
-
-			if cfg.SkipRootFolderCheck == false {
+			if !cfg.SkipRootFolderCheck {
 				allURLs = append(allURLs, fmt.Sprintf("%s://%s/%s", dp.protocol, dp.domain, path))
 			}
-
 			if len(cfg.BasePaths) > 0 {
 				for _, basePath := range cfg.BasePaths {
 					allURLs = append(allURLs, fmt.Sprintf("%s://%s/%s/%s", dp.protocol, dp.domain, basePath, path))
 				}
 			}
-
-			if cfg.DontGeneratePaths == true {
+			if cfg.DontGeneratePaths {
 				continue
 			}
 

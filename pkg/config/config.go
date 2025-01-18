@@ -10,6 +10,8 @@ import (
 	"time"
 )
 
+var defaultAppendEnvList = []string{"prod", "qa", "dev", "test", "uat", "stg", "stage", "sit", "api"}
+
 type Config struct {
 	DomainsFile              string
 	Domain                   string
@@ -36,6 +38,8 @@ type Config struct {
 	ContentTypes             string
 	DisallowedContentTypes   string
 	DisallowedContentStrings string
+	EnvAppendWords           string
+	AppendEnvList            []string
 }
 
 func ParseFlags() Config {
@@ -70,6 +74,8 @@ func ParseFlags() Config {
 
 	var extraHeaders string
 	flag.StringVar(&extraHeaders, "headers", "", "Extra headers to add to each request (format: 'Header1:Value1,Header2:Value2')")
+
+	flag.StringVar(&cfg.EnvAppendWords, "env-append-words", "", "Comma-separated list of environment words to append (e.g. dev,prod,api)")
 
 	flag.Parse()
 
@@ -111,6 +117,18 @@ func ParseFlags() Config {
 			fmt.Printf("Error reading base paths file: %v\n", err)
 			os.Exit(1)
 		}
+	}
+
+	if cfg.EnvAppendWords == "" {
+		// Use the default if user did not supply anything
+		cfg.AppendEnvList = defaultAppendEnvList
+	} else {
+		// Split the user-supplied CSV
+		customList := strings.Split(cfg.EnvAppendWords, ",")
+		for i := range customList {
+			customList[i] = strings.TrimSpace(customList[i])
+		}
+		cfg.AppendEnvList = customList
 	}
 
 	return cfg
