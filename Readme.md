@@ -114,6 +114,7 @@ or
 - `-content-types`: Content type to filter(csv allowed, e.g. json,octet)
 - `-disallowed-content-types`: Content-Type header value to filter out (csv allowed, e.g. json,octet)
 - `-disallowed-content-strings`: Content-Type header value to filter out (csv allowed, e.g. '<html>,<body>')
+- `-disable-duplicate-check`: Disables duplicate checks. Keeping it active  (default: False)
 - `-env-append-words`: Comma-separated list of environment words to append (e.g., dev,prod,api). If not specified, defaults to: prod,qa,dev,test,uat,stg,stage,sit,api
 
 ### Examples
