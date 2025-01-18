@@ -40,6 +40,7 @@ type Config struct {
 	DisallowedContentStrings string
 	EnvAppendWords           string
 	AppendEnvList            []string
+	DisableDuplicateCheck    bool
 }
 
 func ParseFlags() Config {
@@ -68,6 +69,7 @@ func ParseFlags() Config {
 	flag.Int64Var(&cfg.MinContentSize, "min-content-size", 0, "Minimum file size to detect (in bytes)")
 	flag.Int64Var(&cfg.MaxContentRead, "max-content-read", 5*1024*1024, "Maximum size of content to read for marker checking (in bytes)")
 	flag.StringVar(&cfg.HTTPStatusCodes, "http-statuses", "", "HTTP status code to filter (csv allowed)")
+	flag.BoolVar(&cfg.DisableDuplicateCheck, "disable-duplicate-check", false, "Disable duplicate response check by host and size")
 
 	var proxyURLStr string
 	flag.StringVar(&proxyURLStr, "proxy", "", "Proxy URL (e.g., http://127.0.0.1:8080)")

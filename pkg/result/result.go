@@ -181,12 +181,13 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 	}
 
 	host := extractHost(result.URL)
-
-	if !tracker.isNewResponse(host, result.FileSize) {
-		if cfg.Verbose {
-			log.Printf("Skipped duplicate response size %d for host %s\n", result.FileSize, host)
+	if !cfg.DisableDuplicateCheck {
+		if !tracker.isNewResponse(host, result.FileSize) {
+			if cfg.Verbose {
+				log.Printf("Skipped duplicate response size %d for host %s\n", result.FileSize, host)
+			}
+			return
 		}
-		return
 	}
 
 	// If we get here, all configured conditions were met
