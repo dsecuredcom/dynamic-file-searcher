@@ -172,6 +172,8 @@ func splitDomain(host string, cfg *config.Config) []string {
 					}
 					result = append(result, part+env)
 					result = append(result, part+"-"+env)
+					result = append(result, part+"_"+env)
+					result = append(result, part+"/"+env)
 				}
 			}
 		}
