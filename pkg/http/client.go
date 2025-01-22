@@ -74,7 +74,7 @@ func (c *Client) MakeRequest(url string) result.Result {
 		req.Header.Set(key, value)
 	}
 
-	req.Header.Set("Range", fmt.Sprintf("bytes=0-%d", c.config.MaxContentRead-1))
+	//req.Header.Set("Range", fmt.Sprintf("bytes=0-%d", c.config.MaxContentRead-1))
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
 		return result.Result{URL: url, Error: fmt.Errorf("error fetching: %w", err)}
