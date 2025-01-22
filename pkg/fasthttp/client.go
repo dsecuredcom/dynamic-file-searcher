@@ -85,7 +85,7 @@ func (c *Client) MakeRequest(url string) result.Result {
 	}
 
 	body := resp.Body()
-	print(string(body))
+
 	var totalSize int64
 
 	contentRange := resp.Header.Peek("Content-Range")
