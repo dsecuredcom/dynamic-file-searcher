@@ -207,7 +207,18 @@ func splitDomain(host string, cfg *config.Config) []string {
 		}
 	}
 
-	// Make list unique
+	var additionalItems []string
+	for _, word := range result {
+		if len(word) >= 3 {
+			additionalItems = append(additionalItems, word[:3])
+		}
+		if len(word) >= 4 {
+			additionalItems = append(additionalItems, word[:4])
+		}
+	}
+
+	result = append(result, additionalItems...)
+
 	result = makeUniqueList(result)
 
 	if cfg.AppendByPassesToWords {
