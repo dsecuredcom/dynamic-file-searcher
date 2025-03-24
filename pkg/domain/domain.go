@@ -1,7 +1,6 @@
 package domain
 
 import (
-	"fmt"
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/config"
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/utils"
 	"regexp"
@@ -107,10 +106,10 @@ func splitDomain(host string, cfg *config.Config) []string {
 	}
 
 	// We use a map to avoid duplicates
-	relevantParts := make(map[string]bool)
+	relevantParts := make(map[string]struct{})
 
 	for i := 0; i < len(parts); i++ {
-		relevantParts[parts[i]] = true
+		relevantParts[parts[i]] = struct{}{}
 
 		subParts := strings.FieldsFunc(parts[i], func(r rune) bool {
 			return r == '-' || r == '_'
@@ -118,11 +117,12 @@ func splitDomain(host string, cfg *config.Config) []string {
 
 		// Add each subpart
 		for _, subPart := range subParts {
-			relevantParts[subPart] = true
+			relevantParts[subPart] = struct{}{}
 		}
 	}
 
-	var result []string
+	result := make([]string, 0, len(relevantParts))
+
 	for part := range relevantParts {
 		// Drop parts that are purely numeric
 		if _, err := strconv.Atoi(part); err == nil {
@@ -197,17 +197,19 @@ func splitDomain(host string, cfg *config.Config) []string {
 	}
 
 	// Clean things up
-	for i := 0; i < len(result); i++ {
-		result[i] = strings.TrimRight(result[i], ".-_")
-		result[i] = strings.TrimLeft(result[i], ".-_")
+	i := 0
+	for j := 0; j < len(result); j++ {
+		result[j] = strings.TrimRight(result[j], ".-_")
+		result[j] = strings.TrimLeft(result[j], ".-_")
 
-		if result[i] == "" {
-			result = append(result[:i], result[i+1:]...)
-			i--
+		if result[j] != "" {
+			result[i] = result[j]
+			i++
 		}
 	}
+	result = result[:i]
 
-	var additionalItems []string
+	additionalItems := make([]string, 0, len(result)*2)
 	for _, word := range result {
 		if len(word) >= 3 {
 			additionalItems = append(additionalItems, word[:3])
@@ -217,14 +219,30 @@ func splitDomain(host string, cfg *config.Config) []string {
 		}
 	}
 
-	result = append(result, additionalItems...)
+	if len(additionalItems) > 0 {
+		if cap(result)-len(result) < len(additionalItems) {
+			newResult := make([]string, len(result), len(result)+len(additionalItems))
+			copy(newResult, result)
+			result = newResult
+		}
+		result = append(result, additionalItems...)
+	}
 
 	result = makeUniqueList(result)
 
 	if cfg.AppendByPassesToWords {
-		for _, part := range result {
+		originalResultLen := len(result)
+		// Pre-allocate for bypass characters
+		bypassCount := originalResultLen * len(byPassCharacters)
+		if cap(result)-len(result) < bypassCount {
+			newResult := make([]string, len(result), len(result)+bypassCount)
+			copy(newResult, result)
+			result = newResult
+		}
+
+		for i := 0; i < originalResultLen; i++ {
 			for _, bypass := range byPassCharacters {
-				result = append(result, part+bypass)
+				result = append(result, result[i]+bypass)
 			}
 		}
 	}
@@ -232,12 +250,19 @@ func splitDomain(host string, cfg *config.Config) []string {
 	return result
 }
 
+func GetRelevantDomainParts(host string, cfg *config.Config) []string {
+	return splitDomain(host, cfg)
+}
+
 func makeUniqueList(input []string) []string {
-	keys := make(map[string]bool)
-	list := []string{}
+	// Use empty struct instead of bool to save memory
+	keys := make(map[string]struct{}, len(input))
+	// Pre-allocate result list with appropriate capacity
+	list := make([]string, 0, len(input))
+
 	for _, entry := range input {
-		if _, value := keys[entry]; !value {
-			keys[entry] = true
+		if _, exists := keys[entry]; !exists {
+			keys[entry] = struct{}{}
 			list = append(list, entry)
 		}
 	}
@@ -258,72 +283,6 @@ func GetDomains(domainsFile, singleDomain string) []string {
 		return validDomains
 	}
 	return []string{singleDomain}
-}
-
-func GenerateURLs(domains, paths []string, cfg *config.Config) ([]string, int) {
-	var domainProtocols []domainProtocol
-
-	var proto = "https"
-
-	for _, d := range domains {
-		if cfg.ForceHTTPProt {
-			proto = "http"
-		} else {
-			proto = "https"
-		}
-
-		if strings.HasPrefix(d, "http://") {
-			proto = "http"
-			d = strings.TrimPrefix(d, "http://")
-		}
-
-		if strings.HasPrefix(d, "https://") {
-			proto = "https"
-			d = strings.TrimPrefix(d, "https://")
-		}
-
-		d = strings.TrimSuffix(d, "/")
-
-		domainProtocols = append(domainProtocols, domainProtocol{domain: d, protocol: proto})
-	}
-
-	var allURLs []string
-	for _, dp := range domainProtocols {
-		for _, path := range paths {
-			if strings.HasPrefix(path, "##") {
-				continue
-			}
-			if !cfg.SkipRootFolderCheck {
-				allURLs = append(allURLs, fmt.Sprintf("%s://%s/%s", dp.protocol, dp.domain, path))
-			}
-			if len(cfg.BasePaths) > 0 {
-				for _, basePath := range cfg.BasePaths {
-					allURLs = append(allURLs, fmt.Sprintf("%s://%s/%s/%s", dp.protocol, dp.domain, basePath, path))
-				}
-			}
-			if cfg.DontGeneratePaths {
-				continue
-			}
-
-			words := splitDomain(dp.domain, cfg)
-
-			if len(cfg.BasePaths) == 0 {
-				for _, word := range words {
-					allURLs = append(allURLs, fmt.Sprintf("%s://%s/%s/%s", dp.protocol, dp.domain, word, path))
-				}
-			} else {
-				for _, word := range words {
-					for _, basePath := range cfg.BasePaths {
-						allURLs = append(allURLs, fmt.Sprintf("%s://%s/%s/%s/%s", dp.protocol, dp.domain, basePath, word, path))
-					}
-				}
-			}
-		}
-	}
-
-	allURLs = utils.ShuffleStrings(allURLs)
-
-	return allURLs, len(domainProtocols)
 }
 
 func removeTLD(host string) string {

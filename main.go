@@ -13,13 +13,14 @@ import (
 	"golang.org/x/time/rate"
 	"math/rand"
 	"os"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
 )
 
 const (
-	urlBufferSize = 15000
+	urlBufferSize = 2500
 )
 
 func main() {
@@ -57,6 +58,7 @@ func main() {
 	var processedCount int64
 	var totalURLs int64
 
+	// Start URL generation in a goroutine
 	go generateURLs(initialDomains, paths, cfg, urlChan, &totalURLs)
 
 	var wg sync.WaitGroup
@@ -114,13 +116,97 @@ func printInitialInfo(cfg config.Config, initialDomains, paths []string) {
 func generateURLs(initialDomains, paths []string, cfg config.Config, urlChan chan<- string, totalURLs *int64) {
 	defer close(urlChan)
 
-	for _, d := range initialDomains {
-		domainURLs, _ := domain.GenerateURLs([]string{d}, paths, &cfg)
-		atomic.AddInt64(totalURLs, int64(len(domainURLs)))
-		for _, url := range domainURLs {
-			urlChan <- url
+	for _, domainD := range initialDomains {
+		domainURLCount := generateAndStreamURLs(domainD, paths, &cfg, urlChan)
+		atomic.AddInt64(totalURLs, int64(domainURLCount))
+	}
+}
+
+func generateAndStreamURLs(domainD string, paths []string, cfg *config.Config, urlChan chan<- string) int {
+	var urlCount int
+
+	proto := "https"
+	if cfg.ForceHTTPProt {
+		proto = "http"
+	}
+
+	domainD = strings.TrimPrefix(domainD, "http://")
+	domainD = strings.TrimPrefix(domainD, "https://")
+	domainD = strings.TrimSuffix(domainD, "/")
+
+	var sb strings.Builder
+	sb.Grow(512) // Preallocate sufficient capacity
+
+	for _, path := range paths {
+		if strings.HasPrefix(path, "##") {
+			continue
+		}
+
+		if !cfg.SkipRootFolderCheck {
+			sb.WriteString(proto)
+			sb.WriteString("://")
+			sb.WriteString(domainD)
+			sb.WriteString("/")
+			sb.WriteString(path)
+
+			urlChan <- sb.String()
+			urlCount++
+			sb.Reset()
+		}
+
+		for _, basePath := range cfg.BasePaths {
+			sb.WriteString(proto)
+			sb.WriteString("://")
+			sb.WriteString(domainD)
+			sb.WriteString("/")
+			sb.WriteString(basePath)
+			sb.WriteString("/")
+			sb.WriteString(path)
+
+			urlChan <- sb.String()
+			urlCount++
+			sb.Reset()
+		}
+
+		if cfg.DontGeneratePaths {
+			continue
+		}
+
+		words := domain.GetRelevantDomainParts(domainD, cfg)
+		for _, word := range words {
+			if len(cfg.BasePaths) == 0 {
+				sb.WriteString(proto)
+				sb.WriteString("://")
+				sb.WriteString(domainD)
+				sb.WriteString("/")
+				sb.WriteString(word)
+				sb.WriteString("/")
+				sb.WriteString(path)
+
+				urlChan <- sb.String()
+				urlCount++
+				sb.Reset()
+			} else {
+				for _, basePath := range cfg.BasePaths {
+					sb.WriteString(proto)
+					sb.WriteString("://")
+					sb.WriteString(domainD)
+					sb.WriteString("/")
+					sb.WriteString(basePath)
+					sb.WriteString("/")
+					sb.WriteString(word)
+					sb.WriteString("/")
+					sb.WriteString(path)
+
+					urlChan <- sb.String()
+					urlCount++
+					sb.Reset()
+				}
+			}
 		}
 	}
+
+	return urlCount
 }
 
 func worker(urls <-chan string, results chan<- result.Result, wg *sync.WaitGroup, client interface {
