@@ -25,41 +25,63 @@ type ResponseMap struct {
 }
 
 type responseShard struct {
-	sync.RWMutex
-	responses map[uint64]struct{} // uint64 codiert host und size
+	mu        sync.RWMutex
+	responses map[uint64]struct{}
+}
+
+func fnv1aHash(data string) uint64 {
+	var hash uint64 = 0xcbf29ce484222325 // FNV offset basis
+
+	for i := 0; i < len(data); i++ {
+		hash ^= uint64(data[i])
+		hash *= 0x100000001b3 // FNV prime
+	}
+
+	return hash
 }
 
 func NewResponseMap() *ResponseMap {
 	rm := &ResponseMap{}
 	for i := range rm.shards {
-		rm.shards[i].responses = make(map[uint64]struct{})
+		rm.shards[i].responses = make(map[uint64]struct{}, 64) // Reasonable initial capacity
 	}
 	return rm
 }
 
-func (rm *ResponseMap) getShard(hash uint64) *responseShard {
-	return &rm.shards[hash&0xFF]
+func (rm *ResponseMap) getShard(key string) *responseShard {
+	// Use first byte of hash as shard key for even distribution
+	return &rm.shards[fnv1aHash(key)&0xFF]
 }
 
-func computeHash(host string, size int64) uint64 {
-	h := uint64(14695981039346656037) // FNV offset basis
-	for i := 0; i < len(host); i++ {
-		h ^= uint64(host[i])
-		h *= 1099511628211 // FNV prime
-	}
-	return (h & 0xFFFFFFFFFFFF) | (uint64(size&0xFFFF) << 48)
-}
-
+// Improved response tracking with better collision avoidance
 func (rm *ResponseMap) isNewResponse(host string, size int64) bool {
-	hash := computeHash(host, size)
-	shard := rm.getShard(hash)
+	// Create composite key
+	key := host + ":" + strconv.FormatInt(size, 10)
 
-	shard.Lock()
-	defer shard.Unlock()
+	// Get the appropriate shard
+	shard := rm.getShard(key)
+
+	// Calculate full hash
+	hash := fnv1aHash(key)
+
+	// Check if response exists with minimal locking
+	shard.mu.RLock()
+	_, exists := shard.responses[hash]
+	shard.mu.RUnlock()
+
+	if exists {
+		return false
+	}
+
+	// If not found, acquire write lock and check again
+	shard.mu.Lock()
+	defer shard.mu.Unlock()
 
 	if _, exists := shard.responses[hash]; exists {
 		return false
 	}
+
+	// Add new entry
 	shard.responses[hash] = struct{}{}
 	return true
 }
@@ -67,7 +89,7 @@ func (rm *ResponseMap) isNewResponse(host string, size int64) bool {
 func extractHost(urlStr string) string {
 	parsedURL, err := url.Parse(urlStr)
 	if err != nil {
-		return urlStr // Return original if parsing fails
+		return urlStr
 	}
 	return parsedURL.Host
 }

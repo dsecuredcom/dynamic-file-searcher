@@ -20,7 +20,9 @@ import (
 )
 
 const (
-	urlBufferSize = 2500
+	// Buffer sizes tuned for better memory management
+	urlBufferSize    = 5000 // Increased for better worker feeding
+	resultBufferSize = 100  // Smaller to avoid memory buildup
 )
 
 func main() {
@@ -43,7 +45,7 @@ func main() {
 	printInitialInfo(cfg, initialDomains, paths)
 
 	urlChan := make(chan string, urlBufferSize)
-	resultsChan := make(chan result.Result, cfg.Concurrency)
+	resultsChan := make(chan result.Result, resultBufferSize)
 
 	var client interface {
 		MakeRequest(url string) result.Result

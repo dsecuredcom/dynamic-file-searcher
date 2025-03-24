@@ -26,6 +26,16 @@ var (
 	byPassCharacters = []string{";", "..;"}
 )
 
+var commonTLDsMap map[string]struct{}
+
+func init() {
+	// Initialize the TLD map once at startup
+	commonTLDsMap = make(map[string]struct{}, len(commonTLDs))
+	for _, tld := range commonTLDs {
+		commonTLDsMap[tld] = struct{}{}
+	}
+}
+
 var commonTLDs = []string{
 	// Multi-part TLDs
 	"co.uk", "co.jp", "co.nz", "co.za", "com.au", "com.br", "com.cn", "com.mx", "com.tr", "com.tw",
@@ -60,58 +70,65 @@ var commonTLDs = []string{
 }
 
 func splitDomain(host string, cfg *config.Config) []string {
-
+	// Strip protocol
 	if strings.HasPrefix(host, "http://") {
 		host = strings.TrimPrefix(host, "http://")
 	}
-
 	if strings.HasPrefix(host, "https://") {
 		host = strings.TrimPrefix(host, "https://")
 	}
 
+	// Get just the domain part
 	host = strings.Split(host, "/")[0]
 
+	// Skip IP addresses
 	if ipv4Regex.MatchString(host) || ipv6Regex.MatchString(host) {
-		return []string{}
+		return nil
 	}
 
-	// This is a super naive but effective approach
-	// 1. remove port in case it exists
+	// Remove port if present
 	host = strings.Split(host, ":")[0]
-	// Remove everything that looks like an ip (1-1-1-1, 1.1.1.1)
+
+	// Remove IP-like parts
 	host = ipPartRegex.ReplaceAllString(host, "")
-	// Remove everything that looks like a hash
+
+	// Remove hash-like parts
 	host = md5Regex.ReplaceAllString(host, "")
-	// Remove the top level domain
+
+	// Remove TLD
 	host = removeTLD(host)
-	// Remove regional parts, those are usually not interesting
+
+	// Remove regional parts
 	host = regionPartRegex.ReplaceAllString(host, "")
 
-	// Standardize the relevant host part
+	// Standardize separators
 	host = strings.ReplaceAll(host, "--", "-")
 	host = strings.ReplaceAll(host, "..", ".")
 	host = strings.ReplaceAll(host, "__", "_")
 
-	// Separate the host into parts
+	// Split into parts by dot
 	parts := strings.Split(host, ".")
 
-	// if first part is www, remove it:
+	// Remove "www" if it's the first part
 	if len(parts) > 0 && parts[0] == "www" {
 		parts = parts[1:]
 	}
 
-	// If the host depth is set, only take the first n parts
+	// Limit host depth if configured
 	if cfg.HostDepth > 0 && len(parts) >= cfg.HostDepth {
 		parts = parts[:cfg.HostDepth]
 	}
 
-	// We use a map to avoid duplicates
-	relevantParts := make(map[string]struct{})
+	// Pre-allocate the map with a reasonable capacity
+	estimatedCapacity := len(parts) * 3 // Rough estimate for parts and subparts
+	relevantParts := make(map[string]struct{}, estimatedCapacity)
 
-	for i := 0; i < len(parts); i++ {
-		relevantParts[parts[i]] = struct{}{}
+	// Process each part
+	for _, part := range parts {
+		relevantParts[part] = struct{}{}
 
-		subParts := strings.FieldsFunc(parts[i], func(r rune) bool {
+		// Split by separators
+		subParts := strings.FieldsFunc(part, func(r rune) bool {
 			return r == '-' || r == '_'
 		})
 
@@ -121,41 +138,53 @@ func splitDomain(host string, cfg *config.Config) []string {
 		}
 	}
 
-	result := make([]string, 0, len(relevantParts))
+	// Estimate final result size
+	estimatedResultSize := len(relevantParts)
+	if !cfg.NoEnvAppending {
+		// If we'll be adding env variants, estimate additional capacity
+		estimatedResultSize += len(relevantParts) * len(cfg.AppendEnvList) * 4
+	}
 
+	// Allocate result slice with appropriate capacity
+	result := make([]string, 0, estimatedResultSize)
+
+	// Process each relevant part
 	for part := range relevantParts {
-		// Drop parts that are purely numeric
+		// Skip purely numeric parts
 		if _, err := strconv.Atoi(part); err == nil {
 			continue
 		}
 
-		// If part is just a single character, skip it
-		if len(part) == 1 {
+		// Skip single characters
+		if len(part) <= 1 {
 			continue
 		}
 
-		// If part matches the envRegex, remove this env string and add the rest to results
+		// If part matches environment pattern, add a version without it
 		if envRegex.MatchString(part) {
-			result = append(result, strings.ReplaceAll(part, envRegex.FindString(part), ""))
+			result = append(result, strings.TrimSuffix(part, envRegex.FindString(part)))
 		}
 
-		// If part ends with a number, remove the numeric suffix and add the rest
+		// If part ends with numbers, add a version without the numbers
 		if suffixNumberRegex.MatchString(part) {
-			result = append(result, strings.ReplaceAll(part, suffixNumberRegex.FindString(part), ""))
+			result = append(result, strings.TrimSuffix(part, suffixNumberRegex.FindString(part)))
 		}
 
+		// Add the original part
 		result = append(result, part)
 	}
 
-	// If appending env words is allowed, add them
-	if cfg.NoEnvAppending == false {
-		for _, part := range result {
-			// Skip base word if it is not purely alpha
-			if onlyAlphaRegex.MatchString(part) == false {
+	// Add environment variants if enabled
+	if !cfg.NoEnvAppending {
+		baseLength := len(result)
+		for i := 0; i < baseLength; i++ {
+			part := result[i]
+			// Skip parts that aren't purely alphabetic
+			if !onlyAlphaRegex.MatchString(part) {
 				continue
 			}
 
-			// Some sanity checks to prevent adding too many env words
+			// Skip if part already ends with an environment suffix
 			shouldBeAdded := true
 			for _, env := range cfg.AppendEnvList {
 				if strings.HasSuffix(part, env) {
@@ -166,10 +195,12 @@ func splitDomain(host string, cfg *config.Config) []string {
 
 			if shouldBeAdded {
 				for _, env := range cfg.AppendEnvList {
-					// If part already *contains* env, skip
+					// Skip if part already contains the environment name
 					if strings.Contains(part, env) {
 						continue
 					}
+
+					// Add variants with different separators
 					result = append(result, part+env)
 					result = append(result, part+"-"+env)
 					result = append(result, part+"_"+env)
@@ -179,13 +210,16 @@ func splitDomain(host string, cfg *config.Config) []string {
 		}
 	}
 
-	// If removing environment suffixes is enabled
+	// Remove environment suffixes if enabled
 	if cfg.EnvRemoving {
-		for _, part := range result {
-			// Skip if not purely alpha
+		baseLength := len(result)
+		for i := 0; i < baseLength; i++ {
+			part := result[i]
+			// Skip parts that aren't purely alphabetic
 			if !onlyAlphaRegex.MatchString(part) {
 				continue
 			}
+
 			// If the part ends with a known env word, produce a version with that suffix trimmed
 			for _, env := range cfg.AppendEnvList {
 				if strings.HasSuffix(part, env) {
@@ -196,21 +230,20 @@ func splitDomain(host string, cfg *config.Config) []string {
 		}
 	}
 
-	// Clean things up
-	i := 0
-	for j := 0; j < len(result); j++ {
-		result[j] = strings.TrimRight(result[j], ".-_")
-		result[j] = strings.TrimLeft(result[j], ".-_")
-
-		if result[j] != "" {
-			result[i] = result[j]
-			i++
+	// Clean up results (trim separators)
+	cleanedResult := make([]string, 0, len(result))
+	for _, item := range result {
+		trimmed := strings.Trim(item, ".-_")
+		if trimmed != "" {
+			cleanedResult = append(cleanedResult, trimmed)
 		}
 	}
-	result = result[:i]
 
-	additionalItems := make([]string, 0, len(result)*2)
-	for _, word := range result {
+	// Add short prefixes (3 and 4 character) for common patterns
+	baseLength := len(cleanedResult)
+	additionalItems := make([]string, 0, baseLength*2)
+	for i := 0; i < baseLength; i++ {
+		word := cleanedResult[i]
 		if len(word) >= 3 {
 			additionalItems = append(additionalItems, word[:3])
 		}
@@ -219,32 +252,24 @@ func splitDomain(host string, cfg *config.Config) []string {
 		}
 	}
 
-	if len(additionalItems) > 0 {
-		if cap(result)-len(result) < len(additionalItems) {
-			newResult := make([]string, len(result), len(result)+len(additionalItems))
-			copy(newResult, result)
-			result = newResult
-		}
-		result = append(result, additionalItems...)
-	}
+	// Combine all items
+	result = append(cleanedResult, additionalItems...)
 
+	// Deduplicate
 	result = makeUniqueList(result)
 
+	// Add bypass character variants if enabled
 	if cfg.AppendByPassesToWords {
-		originalResultLen := len(result)
-		// Pre-allocate for bypass characters
-		bypassCount := originalResultLen * len(byPassCharacters)
-		if cap(result)-len(result) < bypassCount {
-			newResult := make([]string, len(result), len(result)+bypassCount)
-			copy(newResult, result)
-			result = newResult
-		}
+		baseLength := len(result)
+		bypassVariants := make([]string, 0, baseLength*len(byPassCharacters))
 
-		for i := 0; i < originalResultLen; i++ {
+		for i := 0; i < baseLength; i++ {
 			for _, bypass := range byPassCharacters {
-				result = append(result, result[i]+bypass)
+				bypassVariants = append(bypassVariants, result[i]+bypass)
 			}
 		}
+
+		result = append(result, bypassVariants...)
 	}
 
 	return result
@@ -255,33 +280,38 @@ func GetRelevantDomainParts(host string, cfg *config.Config) []string {
 }
 
 func makeUniqueList(input []string) []string {
-	// Use empty struct instead of bool to save memory
-	keys := make(map[string]struct{}, len(input))
-	// Pre-allocate result list with appropriate capacity
-	list := make([]string, 0, len(input))
+	// Use a map for deduplication
+	seen := make(map[string]struct{}, len(input))
+	result := make([]string, 0, len(input))
 
-	for _, entry := range input {
-		if _, exists := keys[entry]; !exists {
-			keys[entry] = struct{}{}
-			list = append(list, entry)
+	for _, item := range input {
+		if _, exists := seen[item]; !exists {
+			seen[item] = struct{}{}
+			result = append(result, item)
 		}
 	}
-	return list
+
+	return result
 }
 
 func GetDomains(domainsFile, singleDomain string) []string {
 	if domainsFile != "" {
 		allLines := utils.ReadLines(domainsFile)
-		var validDomains []string
+		// Pre-allocate with a capacity based on the number of lines
+		validDomains := make([]string, 0, len(allLines))
+
 		for _, line := range allLines {
 			trimmedLine := strings.TrimSpace(line)
 			if trimmedLine != "" && !strings.HasPrefix(trimmedLine, "#") {
 				validDomains = append(validDomains, trimmedLine)
 			}
 		}
+
 		validDomains = utils.ShuffleStrings(validDomains)
 		return validDomains
 	}
+
+	// Return single domain as a slice
 	return []string{singleDomain}
 }
 
@@ -289,12 +319,11 @@ func removeTLD(host string) string {
 	host = strings.ToLower(host)
 	parts := strings.Split(host, ".")
 
+	// Iterate through possible multi-part TLDs
 	for i := 0; i < len(parts); i++ {
 		potentialTLD := strings.Join(parts[i:], ".")
-		for _, tld := range commonTLDs {
-			if potentialTLD == tld {
-				return strings.Join(parts[:i], ".")
-			}
+		if _, exists := commonTLDsMap[potentialTLD]; exists {
+			return strings.Join(parts[:i], ".")
 		}
 	}
 
