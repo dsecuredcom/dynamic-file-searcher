@@ -2,6 +2,7 @@
 package result
 
 import (
+	"container/list"
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/config"
 	"github.com/fatih/color"
 	"log"
@@ -21,13 +22,22 @@ type Result struct {
 	ContentType string
 }
 
+// LRU-based ResponseMap with size limit
 type ResponseMap struct {
-	shards [256]responseShard
+	shards   [256]responseShard
+	maxItems int
 }
 
 type responseShard struct {
 	mu        sync.RWMutex
-	responses map[uint64]struct{}
+	responses map[uint64]*list.Element
+	lru       *list.List
+	maxItems  int
+}
+
+type cacheEntry struct {
+	hash uint64
+	key  string
 }
 
 func fnv1aHash(data string) uint64 {
@@ -42,48 +52,53 @@ func fnv1aHash(data string) uint64 {
 }
 
 func NewResponseMap() *ResponseMap {
-	rm := &ResponseMap{}
+	rm := &ResponseMap{
+		maxItems: 10000, // Limit total items across all shards
+	}
+
+	itemsPerShard := rm.maxItems / 256
 	for i := range rm.shards {
-		rm.shards[i].responses = make(map[uint64]struct{}, 64) // Reasonable initial capacity
+		rm.shards[i].responses = make(map[uint64]*list.Element, itemsPerShard)
+		rm.shards[i].lru = list.New()
+		rm.shards[i].maxItems = itemsPerShard
 	}
 	return rm
 }
 
 func (rm *ResponseMap) getShard(key string) *responseShard {
-	// Use first byte of hash as shard key for even distribution
 	return &rm.shards[fnv1aHash(key)&0xFF]
 }
 
-// Improved response tracking with better collision avoidance
 func (rm *ResponseMap) isNewResponse(host string, size int64) bool {
-	// Create composite key
 	key := host + ":" + strconv.FormatInt(size, 10)
-
-	// Get the appropriate shard
 	shard := rm.getShard(key)
-
-	// Calculate full hash
 	hash := fnv1aHash(key)
 
-	// Check if response exists with minimal locking
-	shard.mu.RLock()
-	_, exists := shard.responses[hash]
-	shard.mu.RUnlock()
-
-	if exists {
-		return false
-	}
-
-	// If not found, acquire write lock and check again
 	shard.mu.Lock()
 	defer shard.mu.Unlock()
 
-	if _, exists := shard.responses[hash]; exists {
+	// Check if exists
+	if elem, exists := shard.responses[hash]; exists {
+		// Move to front (LRU)
+		shard.lru.MoveToFront(elem)
 		return false
 	}
 
 	// Add new entry
-	shard.responses[hash] = struct{}{}
+	entry := &cacheEntry{hash: hash, key: key}
+	elem := shard.lru.PushFront(entry)
+	shard.responses[hash] = elem
+
+	// Evict oldest if over limit
+	if shard.lru.Len() > shard.maxItems {
+		oldest := shard.lru.Back()
+		if oldest != nil {
+			oldEntry := oldest.Value.(*cacheEntry)
+			delete(shard.responses, oldEntry.hash)
+			shard.lru.Remove(oldest)
+		}
+	}
+
 	return true
 }
 
@@ -105,13 +120,16 @@ var stringPool = sync.Pool{
 }
 
 func ProcessResult(result Result, cfg config.Config, markers []string) {
+	// Defer cleanup to ensure memory is freed
+	defer func() {
+		result.Content = "" // Always clear content at end
+	}()
+
 	// Early exit for errors
 	if result.Error != nil {
 		if cfg.Verbose {
 			log.Printf("Error processing %s: %v\n", result.URL, result.Error)
 		}
-		// Clear content to free memory
-		result.Content = ""
 		return
 	}
 
@@ -120,30 +138,106 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 	if disallowedContentTypes != "" {
 		disallowedContentTypesList := strings.Split(disallowedContentTypes, ",")
 		if isDisallowedContentType(strings.ToLower(result.ContentType), disallowedContentTypesList) {
-			result.Content = "" // Free memory
 			return
 		}
 	}
 
+	// For large content, process in chunks to avoid keeping entire content in memory
+	if len(result.Content) > 1024*1024 { // 1MB threshold
+		if !processLargeContent(result, cfg, markers) {
+			return
+		}
+	} else {
+		// Regular processing for smaller content
+		if !processRegularContent(result, cfg, markers) {
+			return
+		}
+	}
+
+	// Check duplicate responses
+	host := extractHost(result.URL)
+	if !cfg.DisableDuplicateCheck {
+		if !tracker.isNewResponse(host, result.FileSize) {
+			if cfg.Verbose {
+				log.Printf("Skipped duplicate response size %d for host %s\n", result.FileSize, host)
+			}
+			return
+		}
+	}
+
+	// Output results
+	outputResults(result, cfg, markers)
+}
+
+func processLargeContent(result Result, cfg config.Config, markers []string) bool {
+	// Check disallowed strings in chunks
+	disallowedContentStrings := strings.ToLower(cfg.DisallowedContentStrings)
+	if disallowedContentStrings != "" {
+		disallowedContentStringsList := strings.Split(disallowedContentStrings, ",")
+
+		// Process in 64KB chunks
+		chunkSize := 65536
+		for i := 0; i < len(result.Content); i += chunkSize {
+			end := i + chunkSize
+			if end > len(result.Content) {
+				end = len(result.Content)
+			}
+
+			chunk := strings.ToLower(result.Content[i:end])
+			for _, disallowed := range disallowedContentStringsList {
+				if disallowed != "" && strings.Contains(chunk, strings.ToLower(disallowed)) {
+					return false
+				}
+			}
+		}
+	}
+
+	// Check markers in chunks
+	if len(markers) > 0 {
+		for _, marker := range markers {
+			if strings.HasPrefix(marker, "regex:") {
+				regex := strings.TrimPrefix(marker, "regex:")
+				if match, _ := regexp.MatchString(regex, result.Content); match {
+					return true
+				}
+			} else {
+				// For non-regex markers, check in chunks
+				chunkSize := 65536
+				for i := 0; i < len(result.Content); i += chunkSize {
+					end := i + chunkSize
+					if end > len(result.Content) {
+						end = len(result.Content)
+					}
+
+					if strings.Contains(result.Content[i:end], marker) {
+						return true
+					}
+				}
+			}
+		}
+		return false // No marker found
+	}
+
+	return checkRules(result, cfg)
+}
+
+func processRegularContent(result Result, cfg config.Config, markers []string) bool {
 	// Check if content contains disallowed strings
 	disallowedContentStrings := strings.ToLower(cfg.DisallowedContentStrings)
 	if disallowedContentStrings != "" {
 		disallowedContentStringsList := strings.Split(disallowedContentStrings, ",")
 		if containsDisallowedStringInContent(result.Content, disallowedContentStringsList) {
-			result.Content = "" // Free memory
-			return
+			return false
 		}
 	}
 
 	markerFound := false
 	hasMarkers := len(markers) > 0
-	usedMarker := ""
 
 	if hasMarkers {
 		for _, marker := range markers {
 			if strings.HasPrefix(marker, "regex:") == false && strings.Contains(result.Content, marker) {
 				markerFound = true
-				usedMarker = marker
 				break
 			}
 
@@ -151,13 +245,20 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 				regex := strings.TrimPrefix(marker, "regex:")
 				if match, _ := regexp.MatchString(regex, result.Content); match {
 					markerFound = true
-					usedMarker = marker
 					break
 				}
 			}
 		}
+
+		if !markerFound {
+			return false
+		}
 	}
 
+	return checkRules(result, cfg)
+}
+
+func checkRules(result Result, cfg config.Config) bool {
 	rulesMatched := 0
 	rulesCount := 0
 
@@ -188,12 +289,10 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		}
 	}
 
-	// Check content size
 	if cfg.MinContentSize > 0 && result.FileSize >= cfg.MinContentSize {
 		rulesMatched++
 	}
 
-	// Check content types
 	if cfg.ContentTypes != "" {
 		allowedContentTypes := strings.ToLower(cfg.ContentTypes)
 		allowedContentTypesList := strings.Split(allowedContentTypes, ",")
@@ -206,55 +305,38 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		}
 	}
 
-	// Determine if rules match
-	rulesPass := rulesCount == 0 || (rulesCount > 0 && rulesMatched == rulesCount)
+	return rulesCount == 0 || (rulesCount > 0 && rulesMatched == rulesCount)
+}
 
-	// Final decision based on both markers and rules
-	if (hasMarkers && !markerFound) || (rulesCount > 0 && !rulesPass) {
-		// If we have markers but didn't find one, OR if we have rules but they didn't pass, skip
-		if cfg.Verbose {
-			log.Printf("Skipped: %s (Status: %d, Size: %d bytes, Type: %s)\n",
-				result.URL, result.StatusCode, result.FileSize, result.ContentType)
-		}
-		result.Content = "" // Free memory
-		return
-	}
-
-	host := extractHost(result.URL)
-	if !cfg.DisableDuplicateCheck {
-		if !tracker.isNewResponse(host, result.FileSize) {
-			if cfg.Verbose {
-				log.Printf("Skipped duplicate response size %d for host %s\n", result.FileSize, host)
-			}
-			result.Content = "" // Free memory
-			return
-		}
-	}
-
-	// If we get here, all configured conditions were met
+func outputResults(result Result, cfg config.Config, markers []string) {
 	color.Red("\n[!]\tMatch found in %s", result.URL)
-	if hasMarkers {
+
+	// Find which marker matched (if any)
+	usedMarker := ""
+	for _, marker := range markers {
+		if strings.HasPrefix(marker, "regex:") == false && strings.Contains(result.Content, marker) {
+			usedMarker = marker
+			break
+		}
+
+		if strings.HasPrefix(marker, "regex:") {
+			regex := strings.TrimPrefix(marker, "regex:")
+			if match, _ := regexp.MatchString(regex, result.Content); match {
+				usedMarker = marker
+				break
+			}
+		}
+	}
+
+	if usedMarker != "" {
 		color.Red("\tMarkers check: passed (%s)", usedMarker)
 	}
 
 	color.Red("\tRules check: passed (S: %d, FS: %d, CT: %s)",
 		result.StatusCode, result.FileSize, result.ContentType)
 
-	// Process content with string builder from pool
-	sb := stringPool.Get().(*strings.Builder)
-	defer func() {
-		sb.Reset()
-		stringPool.Put(sb)
-	}()
-
-	// Remove newlines efficiently
-	for _, r := range result.Content {
-		if r != '\n' {
-			sb.WriteRune(r)
-		}
-	}
-	content := sb.String()
-
+	// Show limited content preview
+	content := strings.ReplaceAll(result.Content, "\n", "")
 	if len(content) > 150 {
 		color.Green("\n[!]\tBody: %s\n", content[:150])
 	} else {
@@ -265,9 +347,6 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		log.Printf("Processed: %s (Status: %d, Size: %d bytes, Type: %s)\n",
 			result.URL, result.StatusCode, result.FileSize, result.ContentType)
 	}
-
-	// Clear content to free memory
-	result.Content = ""
 }
 
 func containsDisallowedStringInContent(contentBody string, disallowedContentStringsList []string) bool {

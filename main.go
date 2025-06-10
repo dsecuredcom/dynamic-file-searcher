@@ -23,11 +23,9 @@ import (
 )
 
 const (
-	urlBufferSize    = 750
-	resultBufferSize = 25
+	urlBufferSize    = 50 // Reduced from 750
+	resultBufferSize = 10 // Reduced from 25
 )
-
-const domainChunkSize = 100
 
 var builderPool = sync.Pool{
 	New: func() interface{} {
@@ -36,8 +34,9 @@ var builderPool = sync.Pool{
 }
 
 func main() {
-	debug.SetGCPercent(75)
-	debug.SetMemoryLimit(1600 * 1024 * 1024)
+	// More aggressive GC settings for low memory
+	debug.SetGCPercent(50)                   // Reduced from 75
+	debug.SetMemoryLimit(1024 * 1024 * 1024) // 1GB limit
 
 	var markers []string
 
@@ -49,6 +48,7 @@ func main() {
 		markers = utils.ReadLines(cfg.MarkersFile)
 	}
 
+	// Create rate limiter with burst of 1
 	limiter := rate.NewLimiter(rate.Limit(cfg.Concurrency), 1)
 
 	validateInput(initialDomains, paths, markers)
@@ -59,6 +59,9 @@ func main() {
 
 	urlChan := make(chan string, urlBufferSize)
 	resultsChan := make(chan result.Result, resultBufferSize)
+
+	// Memory-bounded semaphore for active requests
+	requestSemaphore := make(chan struct{}, cfg.Concurrency)
 
 	var client interface {
 		MakeRequest(url string) result.Result
@@ -73,13 +76,14 @@ func main() {
 	var processedCount int64
 	var totalURLs int64
 
-	// Start URL generation in a goroutine
-	go generateURLsStreaming(initialDomains, paths, cfg, urlChan, &totalURLs)
+	// Start URL generation with better backpressure
+	go generateURLsWithBackpressure(initialDomains, paths, cfg, urlChan, &totalURLs)
 
 	var wg sync.WaitGroup
+	// Reduce workers to match concurrency limit
 	for i := 0; i < cfg.Concurrency; i++ {
 		wg.Add(1)
-		go worker(urlChan, resultsChan, &wg, client, &processedCount, limiter)
+		go worker(urlChan, resultsChan, &wg, client, &processedCount, limiter, requestSemaphore)
 	}
 
 	done := make(chan bool)
@@ -91,8 +95,16 @@ func main() {
 		done <- true
 	}()
 
+	// Process results with periodic GC
+	resultCount := 0
 	for res := range resultsChan {
 		result.ProcessResult(res, cfg, markers)
+		resultCount++
+
+		// Force GC every 100 results to free memory
+		if resultCount%100 == 0 {
+			runtime.GC()
+		}
 	}
 
 	color.Green("\n[✔] Scan completed.")
@@ -127,76 +139,27 @@ func printInitialInfo(cfg config.Config, initialDomains, paths []string) {
 	}
 }
 
-// New streaming URL generation
-func generateURLsStreaming(domains, paths []string, cfg config.Config, urlChan chan<- string, totalURLs *int64) {
+// Improved URL generation with proper backpressure
+func generateURLsWithBackpressure(domains, paths []string, cfg config.Config, urlChan chan<- string, totalURLs *int64) {
 	defer close(urlChan)
 
-	// Estimate upfront (optional)
-	estimate := estimateURLCount(domains, paths, &cfg)
-	*totalURLs = int64(estimate)
-
-	// Chunked generation with occasional GC
-	const chunkSize = 100
-	for i := 0; i < len(domains); i += chunkSize {
-		end := i + chunkSize
-		if end > len(domains) {
-			end = len(domains)
-		}
-		for _, d := range domains[i:end] {
-			streamURLsForDomain(d, paths, &cfg, urlChan)
-		}
-		// Trigger GC if memory grows too much
+	// Don't pre-calculate total URLs to save memory
+	// Process domains one by one
+	for _, d := range domains {
+		// Check memory before processing each domain
 		var m runtime.MemStats
 		runtime.ReadMemStats(&m)
-		if m.Alloc > 1500*1024*1024 {
+		if m.Alloc > 900*1024*1024 { // If approaching 900MB
 			runtime.GC()
+			time.Sleep(100 * time.Millisecond) // Give GC time to work
 		}
+
+		streamURLsForDomainWithBackpressure(d, paths, &cfg, urlChan, totalURLs)
 	}
 }
 
-// Estimate URL count without generating them
-func estimateURLCount(domains, paths []string, cfg *config.Config) int {
-	count := 0
-
-	// Sample estimation based on first domain
-	if len(domains) > 0 {
-		sampleDomain := domains[0]
-		partsCount := 0
-
-		domain.StreamDomainParts(sampleDomain, cfg, func(part string) {
-			partsCount++
-		})
-
-		// Estimate per domain
-		perDomainCount := 0
-		for _, path := range paths {
-			if strings.HasPrefix(path, "##") {
-				continue
-			}
-
-			if !cfg.SkipRootFolderCheck {
-				perDomainCount++
-			}
-
-			perDomainCount += len(cfg.BasePaths)
-
-			if !cfg.DontGeneratePaths {
-				if len(cfg.BasePaths) == 0 {
-					perDomainCount += partsCount
-				} else {
-					perDomainCount += partsCount * len(cfg.BasePaths)
-				}
-			}
-		}
-
-		count = perDomainCount * len(domains)
-	}
-
-	return count
-}
-
-// Stream URLs for a single domain
-func streamURLsForDomain(domainD string, paths []string, cfg *config.Config, urlChan chan<- string) {
+// Stream URLs with proper backpressure (blocking sends)
+func streamURLsForDomainWithBackpressure(domainD string, paths []string, cfg *config.Config, urlChan chan<- string, totalURLs *int64) {
 	proto := "https"
 	if cfg.ForceHTTPProt {
 		proto = "http"
@@ -216,6 +179,7 @@ func streamURLsForDomain(domainD string, paths []string, cfg *config.Config, url
 	}()
 	b.Grow(256)
 
+	// Process paths one by one to reduce memory pressure
 	for _, path := range paths {
 		if strings.HasPrefix(path, "##") {
 			continue
@@ -229,10 +193,10 @@ func streamURLsForDomain(domainD string, paths []string, cfg *config.Config, url
 			b.WriteString(d)
 			b.WriteString("/")
 			b.WriteString(path)
-			select {
-			case urlChan <- b.String():
-			default:
-			}
+
+			// Blocking send - will wait if channel is full
+			urlChan <- b.String()
+			atomic.AddInt64(totalURLs, 1)
 		}
 
 		// Base paths
@@ -245,28 +209,45 @@ func streamURLsForDomain(domainD string, paths []string, cfg *config.Config, url
 			b.WriteString(base)
 			b.WriteString("/")
 			b.WriteString(path)
-			select {
-			case urlChan <- b.String():
-			default:
-			}
+
+			urlChan <- b.String()
+			atomic.AddInt64(totalURLs, 1)
 		}
 
 		if cfg.DontGeneratePaths {
 			continue
 		}
 
+		// Generate domain parts one by one
 		domain.StreamDomainParts(d, cfg, func(word string) {
-			b.Reset()
-			b.WriteString(proto)
-			b.WriteString("://")
-			b.WriteString(d)
-			b.WriteString("/")
-			b.WriteString(word)
-			b.WriteString("/")
-			b.WriteString(path)
-			select {
-			case urlChan <- b.String():
-			default:
+			if len(cfg.BasePaths) == 0 {
+				b.Reset()
+				b.WriteString(proto)
+				b.WriteString("://")
+				b.WriteString(d)
+				b.WriteString("/")
+				b.WriteString(word)
+				b.WriteString("/")
+				b.WriteString(path)
+
+				urlChan <- b.String()
+				atomic.AddInt64(totalURLs, 1)
+			} else {
+				for _, base := range cfg.BasePaths {
+					b.Reset()
+					b.WriteString(proto)
+					b.WriteString("://")
+					b.WriteString(d)
+					b.WriteString("/")
+					b.WriteString(base)
+					b.WriteString("/")
+					b.WriteString(word)
+					b.WriteString("/")
+					b.WriteString(path)
+
+					urlChan <- b.String()
+					atomic.AddInt64(totalURLs, 1)
+				}
 			}
 		})
 	}
@@ -274,23 +255,34 @@ func streamURLsForDomain(domainD string, paths []string, cfg *config.Config, url
 
 func worker(urls <-chan string, results chan<- result.Result, wg *sync.WaitGroup, client interface {
 	MakeRequest(url string) result.Result
-}, processedCount *int64, limiter *rate.Limiter) {
+}, processedCount *int64, limiter *rate.Limiter, semaphore chan struct{}) {
 	defer wg.Done()
 
 	for url := range urls {
+		// Acquire semaphore to limit concurrent requests
+		semaphore <- struct{}{}
+
 		err := limiter.Wait(context.Background())
 		if err != nil {
+			<-semaphore
 			continue
 		}
+
 		res := client.MakeRequest(url)
 		atomic.AddInt64(processedCount, 1)
 
-		// Non-blocking send to results
+		// Send result with timeout to prevent blocking
 		select {
 		case results <- res:
-		case <-time.After(50 * time.Millisecond):
-			// Skip if results channel is full
+		case <-time.After(100 * time.Millisecond):
+			// Log dropped result if needed
 		}
+
+		// Release semaphore
+		<-semaphore
+
+		// Clear result content to free memory immediately
+		res.Content = ""
 	}
 }
 
@@ -317,18 +309,23 @@ func trackProgress(processedCount, totalURLs *int64, done chan bool) {
 			intervalProcessed := currentProcessed - lastProcessed
 			rps := float64(intervalProcessed) / intervalElapsed.Seconds()
 
+			// Memory stats
+			var m runtime.MemStats
+			runtime.ReadMemStats(&m)
+			memMB := m.Alloc / 1024 / 1024
+
 			if total > 0 {
 				percentage := float64(currentProcessed) / float64(total) * 100
 				estimatedTotal := float64(elapsed) / (float64(currentProcessed) / float64(total))
 				remainingTime := time.Duration(estimatedTotal - float64(elapsed))
 				fmt.Printf("\r%-100s", "")
-				fmt.Printf("\rProgress: %.2f%% (%d/%d) | RPS: %.2f | Elapsed: %s | ETA: %s",
-					percentage, currentProcessed, total, rps,
+				fmt.Printf("\rProgress: %.2f%% (%d/%d) | RPS: %.2f | Mem: %dMB | Elapsed: %s | ETA: %s",
+					percentage, currentProcessed, total, rps, memMB,
 					elapsed.Round(time.Second), remainingTime.Round(time.Second))
 			} else {
 				fmt.Printf("\r%-100s", "")
-				fmt.Printf("\rProcessed: %d | RPS: %.2f | Elapsed: %s",
-					currentProcessed, rps, elapsed.Round(time.Second))
+				fmt.Printf("\rProcessed: %d | RPS: %.2f | Mem: %dMB | Elapsed: %s",
+					currentProcessed, rps, memMB, elapsed.Round(time.Second))
 			}
 
 			lastProcessed = currentProcessed

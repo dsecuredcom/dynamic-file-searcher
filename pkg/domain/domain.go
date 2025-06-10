@@ -1,4 +1,3 @@
-// pkg/domain/domain.go
 package domain
 
 import (
@@ -7,7 +6,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 )
 
 type domainProtocol struct {
@@ -23,20 +21,15 @@ var (
 	onlyAlphaRegex    = regexp.MustCompile(`^[a-z]+$`)
 	suffixNumberRegex = regexp.MustCompile(`[\d]+$`)
 	envRegex          = regexp.MustCompile(`(prod|qa|dev|testing|test|uat|stg|stage|staging|developement|production)$`)
-	regionPartRegex   = regexp.MustCompile(`(us-east|us-west|af-south|ap-east|ap-south|ap-northeast|ap-southeast|ca-central|eu-west|eu-north|eu-south|me-south|sa-east|us-east-1|us-east-2|us-west-1|us-west-2|af-south-1|ap-east-1|ap-south-1|ap-northeast-3|ap-northeast-2|ap-southeast-1|ap-southeast-2|ap-southeast-3|ap-northeast-1|ca-central-1|eu-central-1|eu-west-1|eu-west-2|eu-west-3|eu-north-1|eu-south-1|me-south-1|sa-east-1|useast1|useast2|uswest1|uswest2|afsouth1|apeast1|apsouth1|apnortheast3|apnortheast2|apsoutheast1|apsoutheast2|apsoutheast3|apnortheast1|cacentral1|eucentral1|euwest1|euwest2|euwest3|eunorth1|eusouth1|mesouth1|saeast1)`)
-	byPassCharacters  = []string{";", "..;"}
+	// Removed the hard-coded appendEnvList. Use cfg.AppendEnvList instead in splitDomain().
+	regionPartRegex  = regexp.MustCompile(`(us-east|us-west|af-south|ap-east|ap-south|ap-northeast|ap-southeast|ca-central|eu-west|eu-north|eu-south|me-south|sa-east|us-east-1|us-east-2|us-west-1|us-west-2|af-south-1|ap-east-1|ap-south-1|ap-northeast-3|ap-northeast-2|ap-southeast-1|ap-southeast-2|ap-southeast-3|ap-northeast-1|ca-central-1|eu-central-1|eu-west-1|eu-west-2|eu-west-3|eu-north-1|eu-south-1|me-south-1|sa-east-1|useast1|useast2|uswest1|uswest2|afsouth1|apeast1|apsouth1|apnortheast3|apnortheast2|apsoutheast1|apsoutheast2|apsoutheast3|apnortheast1|cacentral1|eucentral1|euwest1|euwest2|euwest3|eunorth1|eusouth1|mesouth1|saeast1)`)
+	byPassCharacters = []string{";", "..;"}
 )
 
 var commonTLDsMap map[string]struct{}
 
-// String builder pool to reduce allocations
-var builderPool = sync.Pool{
-	New: func() interface{} {
-		return &strings.Builder{}
-	},
-}
-
 func init() {
+	// Initialize the TLD map once at startup
 	commonTLDsMap = make(map[string]struct{}, len(commonTLDs))
 	for _, tld := range commonTLDs {
 		commonTLDsMap[tld] = struct{}{}
@@ -76,7 +69,6 @@ var commonTLDs = []string{
 	"wf", "ws", "ye", "yt", "za", "zm", "zw",
 }
 
-// StreamDomainParts generates domain parts using a callback pattern to avoid building large arrays
 func StreamDomainParts(host string, cfg *config.Config, callback func(string)) {
 	// Strip protocol
 	if strings.HasPrefix(host, "http://") {
@@ -127,12 +119,12 @@ func StreamDomainParts(host string, cfg *config.Config, callback func(string)) {
 		parts = parts[:cfg.HostDepth]
 	}
 
-	// Use map to track already sent parts
-	sent := make(map[string]struct{})
+	// Use smaller map to track sent parts - with initial capacity hint
+	sent := make(map[string]struct{}, len(parts)*3) // Estimate ~3 variants per part
 
 	// Helper to send unique parts
 	sendUnique := func(part string) {
-		if _, exists := sent[part]; !exists && part != "" {
+		if _, exists := sent[part]; !exists && part != "" && len(part) > 1 {
 			sent[part] = struct{}{}
 			callback(part)
 		}
@@ -153,15 +145,18 @@ func StreamDomainParts(host string, cfg *config.Config, callback func(string)) {
 		// Process base part
 		sendUnique(part)
 
-		// Split by separators
+		// Split by separators - but limit depth to avoid explosion
 		subParts := strings.FieldsFunc(part, func(r rune) bool {
 			return r == '-' || r == '_'
 		})
 
+		// Limit subparts to avoid memory explosion
+		if len(subParts) > 10 {
+			subParts = subParts[:10]
+		}
+
 		for _, subPart := range subParts {
-			if len(subPart) > 1 {
-				sendUnique(subPart)
-			}
+			sendUnique(subPart)
 		}
 
 		// If part matches environment pattern, add version without it
@@ -176,24 +171,33 @@ func StreamDomainParts(host string, cfg *config.Config, callback func(string)) {
 			sendUnique(cleaned)
 		}
 
-		// Add short prefixes
-		if len(part) >= 3 {
-			sendUnique(part[:3])
-		}
-		if len(part) >= 4 {
-			sendUnique(part[:4])
+		// Add short prefixes - but limit to avoid too many variants
+		if len(sent) < 100 { // Limit total variants
+			if len(part) >= 3 {
+				sendUnique(part[:3])
+			}
+			if len(part) >= 4 {
+				sendUnique(part[:4])
+			}
 		}
 	}
 
-	// Process environment variants if enabled
-	if !cfg.NoEnvAppending {
-		// Collect parts that need env appending
+	// Process environment variants if enabled - but with limits
+	if !cfg.NoEnvAppending && len(sent) < 200 {
+		// Create a slice of parts to iterate (to avoid modifying map while iterating)
+		partsToProcess := make([]string, 0, len(sent))
 		for sentPart := range sent {
-			// Skip if not purely alphabetic
-			if !onlyAlphaRegex.MatchString(sentPart) {
-				continue
+			if onlyAlphaRegex.MatchString(sentPart) {
+				partsToProcess = append(partsToProcess, sentPart)
 			}
+		}
 
+		// Limit parts to process
+		if len(partsToProcess) > 20 {
+			partsToProcess = partsToProcess[:20]
+		}
+
+		for _, sentPart := range partsToProcess {
 			// Skip if already ends with env suffix
 			hasEnvSuffix := false
 			for _, env := range cfg.AppendEnvList {
@@ -204,12 +208,21 @@ func StreamDomainParts(host string, cfg *config.Config, callback func(string)) {
 			}
 
 			if !hasEnvSuffix {
-				for _, env := range cfg.AppendEnvList {
+				// Limit env variants
+				maxEnvs := 3
+				if len(cfg.AppendEnvList) < maxEnvs {
+					maxEnvs = len(cfg.AppendEnvList)
+				}
+
+				for i := 0; i < maxEnvs; i++ {
+					env := cfg.AppendEnvList[i]
 					if !strings.Contains(sentPart, env) {
 						callback(sentPart + env)
 						callback(sentPart + "-" + env)
-						callback(sentPart + "_" + env)
-						callback(sentPart + "/" + env)
+						// Skip underscore variant to reduce combinations
+						// callback(sentPart + "_" + env)
+						// Skip slash variant
+						// callback(sentPart + "/" + env)
 					}
 				}
 			}
@@ -231,17 +244,23 @@ func StreamDomainParts(host string, cfg *config.Config, callback func(string)) {
 		}
 	}
 
-	// Add bypass characters if enabled
-	if cfg.AppendByPassesToWords {
+	// Add bypass characters if enabled - but limit them
+	if cfg.AppendByPassesToWords && len(sent) < 50 {
 		// Create a slice of current parts to avoid modifying map during iteration
 		currentParts := make([]string, 0, len(sent))
 		for part := range sent {
 			currentParts = append(currentParts, part)
 		}
 
+		// Limit parts for bypass
+		if len(currentParts) > 10 {
+			currentParts = currentParts[:10]
+		}
+
 		for _, part := range currentParts {
-			for _, bypass := range byPassCharacters {
-				callback(part + bypass)
+			// Only add first bypass character to reduce combinations
+			if len(byPassCharacters) > 0 {
+				callback(part + byPassCharacters[0])
 			}
 		}
 	}
@@ -268,7 +287,8 @@ func GetDomains(domainsFile, singleDomain string) []string {
 			}
 		}
 
-		validDomains = utils.ShuffleStrings(validDomains)
+		// Don't shuffle to maintain predictable memory usage
+		// validDomains = utils.ShuffleStrings(validDomains)
 		return validDomains
 	}
 

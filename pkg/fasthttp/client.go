@@ -55,9 +55,9 @@ func NewClient(cfg config.Config) *Client {
 			WriteTimeout:                  cfg.Timeout,
 			DisablePathNormalizing:        true,
 			DisableHeaderNamesNormalizing: true,
-			MaxConnsPerHost:               cfg.Concurrency * 2, // Connection pooling
-			MaxIdleConnDuration:           90 * time.Second,
-			MaxConnDuration:               10 * time.Minute,
+			MaxConnsPerHost:               cfg.Concurrency,  // Reduced from cfg.Concurrency * 2
+			MaxIdleConnDuration:           30 * time.Second, // Reduced from 90s
+			MaxConnDuration:               1 * time.Minute,  // Reduced from 10m
 			MaxResponseBodySize:           int(cfg.MaxContentRead),
 			TLSConfig: &tls.Config{
 				InsecureSkipVerify: true,
@@ -104,7 +104,7 @@ func (c *Client) MakeRequest(url string) result.Result {
 		return result.Result{URL: url, Error: fmt.Errorf("error fetching: %w", err)}
 	}
 
-	// Get body efficiently
+	// Get body reference - avoid copying if possible
 	body := resp.Body()
 
 	var totalSize int64
@@ -124,7 +124,18 @@ func (c *Client) MakeRequest(url string) result.Result {
 		contentSize = c.config.MaxContentRead
 	}
 
-	// Make a copy of only what we need
+	// For small content, convert directly
+	if contentSize <= 32*1024 { // 32KB threshold
+		return result.Result{
+			URL:         url,
+			Content:     string(body[:contentSize]),
+			StatusCode:  resp.StatusCode(),
+			FileSize:    totalSize,
+			ContentType: string(resp.Header.Peek("Content-Type")),
+		}
+	}
+
+	// For larger content, make a copy to avoid holding onto the entire response buffer
 	contentCopy := make([]byte, contentSize)
 	copy(contentCopy, body[:contentSize])
 
