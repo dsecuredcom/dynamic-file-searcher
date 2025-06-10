@@ -37,7 +37,7 @@ var builderPool = sync.Pool{
 
 func main() {
 	debug.SetGCPercent(50)
-	debug.SetMemoryLimit(1500 * 1024 * 1024)
+	debug.SetMemoryLimit(3750 * 1024 * 1024)
 
 	var markers []string
 
@@ -148,7 +148,7 @@ func generateURLsStreaming(domains, paths []string, cfg config.Config, urlChan c
 		// Trigger GC if memory grows too much
 		var m runtime.MemStats
 		runtime.ReadMemStats(&m)
-		if m.Alloc > 1250*1024*1024 {
+		if m.Alloc > 3000*1024*1024 {
 			runtime.GC()
 		}
 	}
