@@ -36,7 +36,7 @@ var builderPool = sync.Pool{
 }
 
 func main() {
-	debug.SetGCPercent(50)
+	debug.SetGCPercent(75)
 	debug.SetMemoryLimit(1600 * 1024 * 1024)
 
 	var markers []string
