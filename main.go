@@ -23,8 +23,8 @@ import (
 )
 
 const (
-	urlBufferSize    = 50 // Reduced from 750
-	resultBufferSize = 10 // Reduced from 25
+	urlBufferSize    = 250
+	resultBufferSize = 35
 )
 
 var builderPool = sync.Pool{
@@ -36,7 +36,7 @@ var builderPool = sync.Pool{
 func main() {
 	// More aggressive GC settings for low memory
 	debug.SetGCPercent(50)                   // Reduced from 75
-	debug.SetMemoryLimit(1024 * 1024 * 1024) // 1GB limit
+	debug.SetMemoryLimit(1400 * 1024 * 1024) // 1,4GB limit
 
 	var markers []string
 
