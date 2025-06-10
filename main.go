@@ -14,6 +14,7 @@ import (
 	"golang.org/x/time/rate"
 	"math/rand"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -21,10 +22,11 @@ import (
 )
 
 const (
-	// Reduced buffer sizes for better memory management
-	urlBufferSize    = 1000 // Reduced from 5000
-	resultBufferSize = 50   // Reduced from 100
+	urlBufferSize    = 1000
+	resultBufferSize = 50
 )
+
+const domainChunkSize = 100
 
 func main() {
 	var markers []string
@@ -123,8 +125,25 @@ func generateURLsStreaming(initialDomains, paths []string, cfg config.Config, ur
 	estimatedURLs := estimateURLCount(initialDomains, paths, &cfg)
 	atomic.StoreInt64(totalURLs, int64(estimatedURLs))
 
-	for _, domainD := range initialDomains {
-		streamURLsForDomain(domainD, paths, &cfg, urlChan)
+	// Process domains in chunks
+	for i := 0; i < len(initialDomains); i += domainChunkSize {
+		end := i + domainChunkSize
+		if end > len(initialDomains) {
+			end = len(initialDomains)
+		}
+
+		chunk := initialDomains[i:end]
+
+		// Process chunk
+		for _, domainD := range chunk {
+			streamURLsForDomain(domainD, paths, &cfg, urlChan)
+		}
+
+		// Force GC after each chunk to free memory
+		if i+domainChunkSize < len(initialDomains) {
+			runtime.GC()
+			runtime.Gosched() // Give GC time to run
+		}
 	}
 }
 
