@@ -214,7 +214,7 @@ func streamURLsForDomain(domainD string, paths []string, cfg *config.Config, url
 		b.Reset()
 		builderPool.Put(b)
 	}()
-	b.Grow(256)
+	b.Grow(128)
 
 	for _, path := range paths {
 		if strings.HasPrefix(path, "##") {
