@@ -108,7 +108,7 @@ func (c *Client) MakeRequest(url string) result.Result {
 	limitedReader := io.LimitReader(resp.Body, c.config.MaxContentRead)
 
 	// Read efficiently using the pooled buffer
-	var content []byte
+	content := make([]byte, 0, c.config.MaxContentRead)
 	buf := *bufPtr
 	totalRead := 0
 

@@ -15,6 +15,7 @@ import (
 	"math/rand"
 	"os"
 	"runtime"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -22,13 +23,22 @@ import (
 )
 
 const (
-	urlBufferSize    = 1000
-	resultBufferSize = 50
+	urlBufferSize    = 750
+	resultBufferSize = 25
 )
 
 const domainChunkSize = 100
 
+var builderPool = sync.Pool{
+	New: func() interface{} {
+		return &strings.Builder{}
+	},
+}
+
 func main() {
+	debug.SetGCPercent(50)
+	debug.SetMemoryLimit(1500 * 1024 * 1024)
+
 	var markers []string
 
 	cfg := config.ParseFlags()
@@ -118,31 +128,28 @@ func printInitialInfo(cfg config.Config, initialDomains, paths []string) {
 }
 
 // New streaming URL generation
-func generateURLsStreaming(initialDomains, paths []string, cfg config.Config, urlChan chan<- string, totalURLs *int64) {
+func generateURLsStreaming(domains, paths []string, cfg config.Config, urlChan chan<- string, totalURLs *int64) {
 	defer close(urlChan)
 
-	// Pre-calculate estimated URLs for progress tracking
-	estimatedURLs := estimateURLCount(initialDomains, paths, &cfg)
-	atomic.StoreInt64(totalURLs, int64(estimatedURLs))
+	// Estimate upfront (optional)
+	estimate := estimateURLCount(domains, paths, &cfg)
+	*totalURLs = int64(estimate)
 
-	// Process domains in chunks
-	for i := 0; i < len(initialDomains); i += domainChunkSize {
-		end := i + domainChunkSize
-		if end > len(initialDomains) {
-			end = len(initialDomains)
+	// Chunked generation with occasional GC
+	const chunkSize = 100
+	for i := 0; i < len(domains); i += chunkSize {
+		end := i + chunkSize
+		if end > len(domains) {
+			end = len(domains)
 		}
-
-		chunk := initialDomains[i:end]
-
-		// Process chunk
-		for _, domainD := range chunk {
-			streamURLsForDomain(domainD, paths, &cfg, urlChan)
+		for _, d := range domains[i:end] {
+			streamURLsForDomain(d, paths, &cfg, urlChan)
 		}
-
-		// Force GC after each chunk to free memory
-		if i+domainChunkSize < len(initialDomains) {
+		// Trigger GC if memory grows too much
+		var m runtime.MemStats
+		runtime.ReadMemStats(&m)
+		if m.Alloc > 1250*1024*1024 {
 			runtime.GC()
-			runtime.Gosched() // Give GC time to run
 		}
 	}
 }
@@ -195,83 +202,71 @@ func streamURLsForDomain(domainD string, paths []string, cfg *config.Config, url
 		proto = "http"
 	}
 
-	domainD = strings.TrimPrefix(domainD, "http://")
-	domainD = strings.TrimPrefix(domainD, "https://")
-	domainD = strings.TrimSuffix(domainD, "/")
+	d := strings.TrimSuffix(
+		strings.TrimPrefix(
+			strings.TrimPrefix(domainD, "https://"),
+			"http://"),
+		"/",
+	)
 
-	// Get string builder from pool
-	sb := strings.Builder{}
-	sb.Grow(256)
+	b := builderPool.Get().(*strings.Builder)
+	defer func() {
+		b.Reset()
+		builderPool.Put(b)
+	}()
+	b.Grow(256)
 
 	for _, path := range paths {
 		if strings.HasPrefix(path, "##") {
 			continue
 		}
 
-		// Generate root folder URLs
+		// Root path
 		if !cfg.SkipRootFolderCheck {
-			sb.Reset()
-			sb.WriteString(proto)
-			sb.WriteString("://")
-			sb.WriteString(domainD)
-			sb.WriteString("/")
-			sb.WriteString(path)
-			urlChan <- sb.String()
+			b.Reset()
+			b.WriteString(proto)
+			b.WriteString("://")
+			b.WriteString(d)
+			b.WriteString("/")
+			b.WriteString(path)
+			select {
+			case urlChan <- b.String():
+			default:
+			}
 		}
 
-		// Generate base path URLs
-		for _, basePath := range cfg.BasePaths {
-			sb.Reset()
-			sb.WriteString(proto)
-			sb.WriteString("://")
-			sb.WriteString(domainD)
-			sb.WriteString("/")
-			sb.WriteString(basePath)
-			sb.WriteString("/")
-			sb.WriteString(path)
-			urlChan <- sb.String()
+		// Base paths
+		for _, base := range cfg.BasePaths {
+			b.Reset()
+			b.WriteString(proto)
+			b.WriteString("://")
+			b.WriteString(d)
+			b.WriteString("/")
+			b.WriteString(base)
+			b.WriteString("/")
+			b.WriteString(path)
+			select {
+			case urlChan <- b.String():
+			default:
+			}
 		}
 
 		if cfg.DontGeneratePaths {
 			continue
 		}
 
-		// Stream generated URLs based on domain parts
-		domain.StreamDomainParts(domainD, cfg, func(word string) {
-			if len(cfg.BasePaths) == 0 {
-				sb.Reset()
-				sb.WriteString(proto)
-				sb.WriteString("://")
-				sb.WriteString(domainD)
-				sb.WriteString("/")
-				sb.WriteString(word)
-				sb.WriteString("/")
-				sb.WriteString(path)
-
-				select {
-				case urlChan <- sb.String():
-				case <-time.After(100 * time.Millisecond):
-					// Skip if channel is full to prevent blocking
-				}
-			} else {
-				for _, basePath := range cfg.BasePaths {
-					sb.Reset()
-					sb.WriteString(proto)
-					sb.WriteString("://")
-					sb.WriteString(domainD)
-					sb.WriteString("/")
-					sb.WriteString(basePath)
-					sb.WriteString("/")
-					sb.WriteString(word)
-					sb.WriteString("/")
-					sb.WriteString(path)
-
-					select {
-					case urlChan <- sb.String():
-					case <-time.After(100 * time.Millisecond):
-						// Skip if channel is full to prevent blocking
-					}
-				}
+		domain.StreamDomainParts(d, cfg, func(word string) {
+			b.Reset()
+			b.WriteString(proto)
+			b.WriteString("://")
+			b.WriteString(d)
+			b.WriteString("/")
+			b.WriteString(word)
+			b.WriteString("/")
+			b.WriteString(path)
+			select {
+			case urlChan <- b.String():
+			default:
 			}
 		})
 	}
