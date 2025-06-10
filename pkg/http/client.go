@@ -1,3 +1,4 @@
+// pkg/http/client.go
 package http
 
 import (
@@ -6,9 +7,11 @@ import (
 	"fmt"
 	"io"
 	"math/rand"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/dsecuredcom/dynamic-file-searcher/pkg/config"
@@ -28,17 +31,33 @@ var acceptLanguages = []string{
 	"fr-FR,fr;q=0.9", "de-DE,de;q=0.8", "it-IT,it;q=0.9",
 }
 
+// Buffer pool for reading responses
+var bufferPool = sync.Pool{
+	New: func() interface{} {
+		buf := make([]byte, 32*1024) // 32KB buffers
+		return &buf
+	},
+}
+
 type Client struct {
 	httpClient *http.Client
 	config     config.Config
 }
 
 func NewClient(cfg config.Config) *Client {
+	// Enhanced transport with better connection pooling
 	transport := &http.Transport{
-		MaxIdleConns:        100,
-		MaxIdleConnsPerHost: 100,
+		MaxIdleConns:        cfg.Concurrency * 2,
+		MaxIdleConnsPerHost: cfg.Concurrency,
+		MaxConnsPerHost:     cfg.Concurrency * 2,
 		IdleConnTimeout:     90 * time.Second,
+		DisableCompression:  true, // We handle partial content anyway
 		TLSClientConfig:     &tls.Config{InsecureSkipVerify: true},
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		ResponseHeaderTimeout: cfg.Timeout,
 	}
 
 	if cfg.ProxyURL != nil {
@@ -81,9 +100,30 @@ func (c *Client) MakeRequest(url string) result.Result {
 	}
 	defer resp.Body.Close()
 
-	buffer, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return result.Result{URL: url, Error: fmt.Errorf("error reading body: %w", err)}
+	// Use buffer from pool
+	bufPtr := bufferPool.Get().(*[]byte)
+	defer bufferPool.Put(bufPtr)
+
+	// Read with limited reader to prevent excessive memory usage
+	limitedReader := io.LimitReader(resp.Body, c.config.MaxContentRead)
+
+	// Read efficiently using the pooled buffer
+	var content []byte
+	buf := *bufPtr
+	totalRead := 0
+
+	for {
+		n, err := limitedReader.Read(buf)
+		if n > 0 {
+			content = append(content, buf[:n]...)
+			totalRead += n
+		}
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return result.Result{URL: url, Error: fmt.Errorf("error reading body: %w", err)}
+		}
 	}
 
 	var totalSize int64
@@ -92,13 +132,15 @@ func (c *Client) MakeRequest(url string) result.Result {
 		if len(parts) == 2 {
 			totalSize, _ = strconv.ParseInt(parts[1], 10, 64)
 		}
+	} else if contentLength := resp.Header.Get("Content-Length"); contentLength != "" {
+		totalSize, _ = strconv.ParseInt(contentLength, 10, 64)
 	} else {
-		totalSize = int64(len(buffer))
+		totalSize = int64(totalRead)
 	}
 
 	return result.Result{
 		URL:         url,
-		Content:     string(buffer),
+		Content:     string(content),
 		StatusCode:  resp.StatusCode,
 		FileSize:    totalSize,
 		ContentType: resp.Header.Get("Content-Type"),

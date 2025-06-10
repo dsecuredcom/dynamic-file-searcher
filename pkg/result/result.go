@@ -1,3 +1,4 @@
+// pkg/result/result.go
 package result
 
 import (
@@ -96,26 +97,42 @@ func extractHost(urlStr string) string {
 
 var tracker = NewResponseMap()
 
+// String pool for commonly used strings
+var stringPool = sync.Pool{
+	New: func() interface{} {
+		return new(strings.Builder)
+	},
+}
+
 func ProcessResult(result Result, cfg config.Config, markers []string) {
+	// Early exit for errors
 	if result.Error != nil {
 		if cfg.Verbose {
 			log.Printf("Error processing %s: %v\n", result.URL, result.Error)
 		}
+		// Clear content to free memory
+		result.Content = ""
 		return
 	}
 
 	// Check if content type is disallowed first
-	DisallowedContentTypes := strings.ToLower(cfg.DisallowedContentTypes)
-	DisallowedContentTypesList := strings.Split(DisallowedContentTypes, ",")
-	if isDisallowedContentType(result.ContentType, DisallowedContentTypesList) {
-		return
+	disallowedContentTypes := strings.ToLower(cfg.DisallowedContentTypes)
+	if disallowedContentTypes != "" {
+		disallowedContentTypesList := strings.Split(disallowedContentTypes, ",")
+		if isDisallowedContentType(strings.ToLower(result.ContentType), disallowedContentTypesList) {
+			result.Content = "" // Free memory
+			return
+		}
 	}
 
 	// Check if content contains disallowed strings
-	DisallowedContentStrings := strings.ToLower(cfg.DisallowedContentStrings)
-	DisallowedContentStringsList := strings.Split(DisallowedContentStrings, ",")
-	if containsDisallowedStringInContent(result.Content, DisallowedContentStringsList) {
-		return
+	disallowedContentStrings := strings.ToLower(cfg.DisallowedContentStrings)
+	if disallowedContentStrings != "" {
+		disallowedContentStringsList := strings.Split(disallowedContentStrings, ",")
+		if containsDisallowedStringInContent(result.Content, disallowedContentStringsList) {
+			result.Content = "" // Free memory
+			return
+		}
 	}
 
 	markerFound := false
@@ -157,11 +174,11 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 	}
 
 	if cfg.HTTPStatusCodes != "" {
-		AllowedHttpStatusesList := strings.Split(cfg.HTTPStatusCodes, ",")
-		for _, AllowedHttpStatusString := range AllowedHttpStatusesList {
-			allowedStatus, err := strconv.Atoi(strings.TrimSpace(AllowedHttpStatusString))
+		allowedHttpStatusesList := strings.Split(cfg.HTTPStatusCodes, ",")
+		for _, allowedHttpStatusString := range allowedHttpStatusesList {
+			allowedStatus, err := strconv.Atoi(strings.TrimSpace(allowedHttpStatusString))
 			if err != nil {
-				log.Printf("Error converting status code '%s' to integer: %v", AllowedHttpStatusString, err)
+				log.Printf("Error converting status code '%s' to integer: %v", allowedHttpStatusString, err)
 				continue
 			}
 			if result.StatusCode == allowedStatus {
@@ -178,11 +195,11 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 
 	// Check content types
 	if cfg.ContentTypes != "" {
-		AllowedContentTypes := strings.ToLower(cfg.ContentTypes)
-		AllowedContentTypesList := strings.Split(AllowedContentTypes, ",")
-		ResultContentType := strings.ToLower(result.ContentType)
-		for _, AllowedContentTypeString := range AllowedContentTypesList {
-			if strings.Contains(ResultContentType, AllowedContentTypeString) {
+		allowedContentTypes := strings.ToLower(cfg.ContentTypes)
+		allowedContentTypesList := strings.Split(allowedContentTypes, ",")
+		resultContentType := strings.ToLower(result.ContentType)
+		for _, allowedContentTypeString := range allowedContentTypesList {
+			if strings.Contains(resultContentType, allowedContentTypeString) {
 				rulesMatched++
 				break
 			}
@@ -199,6 +216,7 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 			log.Printf("Skipped: %s (Status: %d, Size: %d bytes, Type: %s)\n",
 				result.URL, result.StatusCode, result.FileSize, result.ContentType)
 		}
+		result.Content = "" // Free memory
 		return
 	}
 
@@ -208,6 +226,7 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 			if cfg.Verbose {
 				log.Printf("Skipped duplicate response size %d for host %s\n", result.FileSize, host)
 			}
+			result.Content = "" // Free memory
 			return
 		}
 	}
@@ -221,8 +240,20 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 	color.Red("\tRules check: passed (S: %d, FS: %d, CT: %s)",
 		result.StatusCode, result.FileSize, result.ContentType)
 
-	content := result.Content
-	content = strings.ReplaceAll(content, "\n", "")
+	// Process content with string builder from pool
+	sb := stringPool.Get().(*strings.Builder)
+	defer func() {
+		sb.Reset()
+		stringPool.Put(sb)
+	}()
+
+	// Remove newlines efficiently
+	for _, r := range result.Content {
+		if r != '\n' {
+			sb.WriteRune(r)
+		}
+	}
+	content := sb.String()
 
 	if len(content) > 150 {
 		color.Green("\n[!]\tBody: %s\n", content[:150])
@@ -234,19 +265,23 @@ func ProcessResult(result Result, cfg config.Config, markers []string) {
 		log.Printf("Processed: %s (Status: %d, Size: %d bytes, Type: %s)\n",
 			result.URL, result.StatusCode, result.FileSize, result.ContentType)
 	}
+
+	// Clear content to free memory
+	result.Content = ""
 }
 
-func containsDisallowedStringInContent(contentBody string, DisallowedContentStringsList []string) bool {
-	if len(DisallowedContentStringsList) == 0 {
+func containsDisallowedStringInContent(contentBody string, disallowedContentStringsList []string) bool {
+	if len(disallowedContentStringsList) == 0 {
 		return false
 	}
 
-	for _, disallowedContentString := range DisallowedContentStringsList {
+	lowerContent := strings.ToLower(contentBody)
+	for _, disallowedContentString := range disallowedContentStringsList {
 		if disallowedContentString == "" {
 			continue
 		}
 
-		if strings.Contains(contentBody, disallowedContentString) {
+		if strings.Contains(lowerContent, strings.ToLower(disallowedContentString)) {
 			return true
 		}
 	}
@@ -254,22 +289,20 @@ func containsDisallowedStringInContent(contentBody string, DisallowedContentStri
 	return false
 }
 
-func isDisallowedContentType(contentType string, DisallowedContentTypesList []string) bool {
-
-	if len(DisallowedContentTypesList) == 0 {
+func isDisallowedContentType(contentType string, disallowedContentTypesList []string) bool {
+	if len(disallowedContentTypesList) == 0 {
 		return false
 	}
 
-	for _, disallowedContentType := range DisallowedContentTypesList {
+	for _, disallowedContentType := range disallowedContentTypesList {
 		if disallowedContentType == "" {
 			continue
 		}
 
-		if strings.Contains(contentType, disallowedContentType) {
+		if strings.Contains(contentType, strings.TrimSpace(disallowedContentType)) {
 			return true
 		}
 	}
 
 	return false
-
 }

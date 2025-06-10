@@ -1,3 +1,4 @@
+// pkg/fasthttp/client.go
 package fasthttp
 
 import (
@@ -10,6 +11,8 @@ import (
 	"math/rand"
 	"strconv"
 	"strings"
+	"sync"
+	"time"
 )
 
 var baseUserAgents = []string{
@@ -25,6 +28,20 @@ var acceptLanguages = []string{
 	"fr-FR,fr;q=0.9", "de-DE,de;q=0.8", "it-IT,it;q=0.9",
 }
 
+// Response pool to reuse response objects
+var responsePool = sync.Pool{
+	New: func() interface{} {
+		return &fasthttp.Response{}
+	},
+}
+
+// Request pool to reuse request objects
+var requestPool = sync.Pool{
+	New: func() interface{} {
+		return &fasthttp.Request{}
+	},
+}
+
 type Client struct {
 	config config.Config
 	client *fasthttp.Client
@@ -37,7 +54,11 @@ func NewClient(cfg config.Config) *Client {
 			ReadTimeout:                   cfg.Timeout,
 			WriteTimeout:                  cfg.Timeout,
 			DisablePathNormalizing:        true,
-			DisableHeaderNamesNormalizing: true, // Prevent automatic header modifications
+			DisableHeaderNamesNormalizing: true,
+			MaxConnsPerHost:               cfg.Concurrency * 2, // Connection pooling
+			MaxIdleConnDuration:           90 * time.Second,
+			MaxConnDuration:               10 * time.Minute,
+			MaxResponseBodySize:           int(cfg.MaxContentRead),
 			TLSConfig: &tls.Config{
 				InsecureSkipVerify: true,
 			},
@@ -46,8 +67,12 @@ func NewClient(cfg config.Config) *Client {
 }
 
 func (c *Client) MakeRequest(url string) result.Result {
-	req := fasthttp.AcquireRequest()
-	defer fasthttp.ReleaseRequest(req)
+	// Get request from pool
+	req := requestPool.Get().(*fasthttp.Request)
+	defer func() {
+		req.Reset()
+		requestPool.Put(req)
+	}()
 
 	req.SetRequestURI(url)
 	req.URI().DisablePathNormalizing = true
@@ -62,20 +87,15 @@ func (c *Client) MakeRequest(url string) result.Result {
 		req.Header.Set(key, value)
 	}
 
-	resp := fasthttp.AcquireResponse()
-	defer fasthttp.ReleaseResponse(resp)
+	// Get response from pool
+	resp := responsePool.Get().(*fasthttp.Response)
+	defer func() {
+		resp.Reset()
+		responsePool.Put(resp)
+	}()
 
-	client := &fasthttp.Client{
-		ReadTimeout:                   c.config.Timeout,
-		WriteTimeout:                  c.config.Timeout,
-		DisableHeaderNamesNormalizing: true,
-		DisablePathNormalizing:        true,
-		TLSConfig: &tls.Config{
-			InsecureSkipVerify: true,
-		},
-	}
-
-	err := client.DoRedirects(req, resp, 0)
+	// Use the pre-configured client with connection pooling
+	err := c.client.DoRedirects(req, resp, 0)
 	if err == fasthttp.ErrMissingLocation {
 		return result.Result{URL: url, Error: fmt.Errorf("error fetching: %w", err)}
 	}
@@ -84,10 +104,10 @@ func (c *Client) MakeRequest(url string) result.Result {
 		return result.Result{URL: url, Error: fmt.Errorf("error fetching: %w", err)}
 	}
 
+	// Get body efficiently
 	body := resp.Body()
 
 	var totalSize int64
-
 	contentRange := resp.Header.Peek("Content-Range")
 	if len(contentRange) > 0 {
 		parts := bytes.Split(contentRange, []byte("/"))
@@ -98,13 +118,19 @@ func (c *Client) MakeRequest(url string) result.Result {
 		totalSize = int64(len(body))
 	}
 
-	if int64(len(body)) > c.config.MaxContentRead {
-		body = body[:c.config.MaxContentRead]
+	// Only copy the amount we need
+	contentSize := int64(len(body))
+	if contentSize > c.config.MaxContentRead {
+		contentSize = c.config.MaxContentRead
 	}
+
+	// Make a copy of only what we need
+	contentCopy := make([]byte, contentSize)
+	copy(contentCopy, body[:contentSize])
 
 	return result.Result{
 		URL:         url,
-		Content:     string(body),
+		Content:     string(contentCopy),
 		StatusCode:  resp.StatusCode(),
 		FileSize:    totalSize,
 		ContentType: string(resp.Header.Peek("Content-Type")),

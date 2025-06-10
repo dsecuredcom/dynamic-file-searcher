@@ -1,3 +1,4 @@
+// main.go
 package main
 
 import (
@@ -20,9 +21,9 @@ import (
 )
 
 const (
-	// Buffer sizes tuned for better memory management
-	urlBufferSize    = 5000 // Increased for better worker feeding
-	resultBufferSize = 100  // Smaller to avoid memory buildup
+	// Reduced buffer sizes for better memory management
+	urlBufferSize    = 1000 // Reduced from 5000
+	resultBufferSize = 50   // Reduced from 100
 )
 
 func main() {
@@ -61,7 +62,7 @@ func main() {
 	var totalURLs int64
 
 	// Start URL generation in a goroutine
-	go generateURLs(initialDomains, paths, cfg, urlChan, &totalURLs)
+	go generateURLsStreaming(initialDomains, paths, cfg, urlChan, &totalURLs)
 
 	var wg sync.WaitGroup
 	for i := 0; i < cfg.Concurrency; i++ {
@@ -102,7 +103,6 @@ func validateInput(initialDomains, paths, markers []string) {
 }
 
 func printInitialInfo(cfg config.Config, initialDomains, paths []string) {
-
 	color.Cyan("[i] Scanning %d domains with %d paths", len(initialDomains), len(paths))
 	color.Cyan("[i] Minimum file size to detect: %d bytes", cfg.MinContentSize)
 	color.Cyan("[i] Filtering for HTTP status code: %s", cfg.HTTPStatusCodes)
@@ -115,18 +115,62 @@ func printInitialInfo(cfg config.Config, initialDomains, paths []string) {
 	}
 }
 
-func generateURLs(initialDomains, paths []string, cfg config.Config, urlChan chan<- string, totalURLs *int64) {
+// New streaming URL generation
+func generateURLsStreaming(initialDomains, paths []string, cfg config.Config, urlChan chan<- string, totalURLs *int64) {
 	defer close(urlChan)
 
+	// Pre-calculate estimated URLs for progress tracking
+	estimatedURLs := estimateURLCount(initialDomains, paths, &cfg)
+	atomic.StoreInt64(totalURLs, int64(estimatedURLs))
+
 	for _, domainD := range initialDomains {
-		domainURLCount := generateAndStreamURLs(domainD, paths, &cfg, urlChan)
-		atomic.AddInt64(totalURLs, int64(domainURLCount))
+		streamURLsForDomain(domainD, paths, &cfg, urlChan)
 	}
 }
 
-func generateAndStreamURLs(domainD string, paths []string, cfg *config.Config, urlChan chan<- string) int {
-	var urlCount int
+// Estimate URL count without generating them
+func estimateURLCount(domains, paths []string, cfg *config.Config) int {
+	count := 0
 
+	// Sample estimation based on first domain
+	if len(domains) > 0 {
+		sampleDomain := domains[0]
+		partsCount := 0
+
+		domain.StreamDomainParts(sampleDomain, cfg, func(part string) {
+			partsCount++
+		})
+
+		// Estimate per domain
+		perDomainCount := 0
+		for _, path := range paths {
+			if strings.HasPrefix(path, "##") {
+				continue
+			}
+
+			if !cfg.SkipRootFolderCheck {
+				perDomainCount++
+			}
+
+			perDomainCount += len(cfg.BasePaths)
+
+			if !cfg.DontGeneratePaths {
+				if len(cfg.BasePaths) == 0 {
+					perDomainCount += partsCount
+				} else {
+					perDomainCount += partsCount * len(cfg.BasePaths)
+				}
+			}
+		}
+
+		count = perDomainCount * len(domains)
+	}
+
+	return count
+}
+
+// Stream URLs for a single domain
+func streamURLsForDomain(domainD string, paths []string, cfg *config.Config, urlChan chan<- string) {
 	proto := "https"
 	if cfg.ForceHTTPProt {
 		proto = "http"
@@ -136,27 +180,29 @@ func generateAndStreamURLs(domainD string, paths []string, cfg *config.Config, u
 	domainD = strings.TrimPrefix(domainD, "https://")
 	domainD = strings.TrimSuffix(domainD, "/")
 
-	var sb strings.Builder
-	sb.Grow(512) // Preallocate sufficient capacity
+	// Get string builder from pool
+	sb := strings.Builder{}
+	sb.Grow(256)
 
 	for _, path := range paths {
 		if strings.HasPrefix(path, "##") {
 			continue
 		}
 
+		// Generate root folder URLs
 		if !cfg.SkipRootFolderCheck {
+			sb.Reset()
 			sb.WriteString(proto)
 			sb.WriteString("://")
 			sb.WriteString(domainD)
 			sb.WriteString("/")
 			sb.WriteString(path)
-
 			urlChan <- sb.String()
-			urlCount++
-			sb.Reset()
 		}
 
+		// Generate base path URLs
 		for _, basePath := range cfg.BasePaths {
+			sb.Reset()
 			sb.WriteString(proto)
 			sb.WriteString("://")
 			sb.WriteString(domainD)
@@ -164,19 +210,17 @@ func generateAndStreamURLs(domainD string, paths []string, cfg *config.Config, u
 			sb.WriteString(basePath)
 			sb.WriteString("/")
 			sb.WriteString(path)
-
 			urlChan <- sb.String()
-			urlCount++
-			sb.Reset()
 		}
 
 		if cfg.DontGeneratePaths {
 			continue
 		}
 
-		words := domain.GetRelevantDomainParts(domainD, cfg)
-		for _, word := range words {
+		// Stream generated URLs based on domain parts
+		domain.StreamDomainParts(domainD, cfg, func(word string) {
 			if len(cfg.BasePaths) == 0 {
+				sb.Reset()
 				sb.WriteString(proto)
 				sb.WriteString("://")
 				sb.WriteString(domainD)
@@ -185,11 +229,14 @@ func generateAndStreamURLs(domainD string, paths []string, cfg *config.Config, u
 				sb.WriteString("/")
 				sb.WriteString(path)
 
-				urlChan <- sb.String()
-				urlCount++
-				sb.Reset()
+				select {
+				case urlChan <- sb.String():
+				case <-time.After(100 * time.Millisecond):
+					// Skip if channel is full to prevent blocking
+				}
 			} else {
 				for _, basePath := range cfg.BasePaths {
+					sb.Reset()
 					sb.WriteString(proto)
 					sb.WriteString("://")
 					sb.WriteString(domainD)
@@ -200,15 +247,15 @@ func generateAndStreamURLs(domainD string, paths []string, cfg *config.Config, u
 					sb.WriteString("/")
 					sb.WriteString(path)
 
-					urlChan <- sb.String()
-					urlCount++
-					sb.Reset()
+					select {
+					case urlChan <- sb.String():
+					case <-time.After(100 * time.Millisecond):
+						// Skip if channel is full to prevent blocking
+					}
 				}
 			}
-		}
+		})
 	}
-
-	return urlCount
 }
 
 func worker(urls <-chan string, results chan<- result.Result, wg *sync.WaitGroup, client interface {
@@ -223,7 +270,13 @@ func worker(urls <-chan string, results chan<- result.Result, wg *sync.WaitGroup
 		}
 		res := client.MakeRequest(url)
 		atomic.AddInt64(processedCount, 1)
-		results <- res
+
+		// Non-blocking send to results
+		select {
+		case results <- res:
+		case <-time.After(50 * time.Millisecond):
+			// Skip if results channel is full
+		}
 	}
 }
 
@@ -232,11 +285,14 @@ func trackProgress(processedCount, totalURLs *int64, done chan bool) {
 	lastProcessed := int64(0)
 	lastUpdate := start
 
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
 	for {
 		select {
 		case <-done:
 			return
-		default:
+		case <-ticker.C:
 			now := time.Now()
 			elapsed := now.Sub(start)
 			currentProcessed := atomic.LoadInt64(processedCount)
@@ -263,8 +319,6 @@ func trackProgress(processedCount, totalURLs *int64, done chan bool) {
 
 			lastProcessed = currentProcessed
 			lastUpdate = now
-
-			time.Sleep(time.Second)
 		}
 	}
 }
