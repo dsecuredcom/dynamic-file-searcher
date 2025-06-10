@@ -49,13 +49,18 @@ func main() {
 	}
 
 	// Create rate limiter with burst of 1
-	limiter := rate.NewLimiter(rate.Limit(cfg.Concurrency), 1)
+	limiter := rate.NewLimiter(rate.Limit(cfg.Concurrency), cfg.Concurrency)
 
 	validateInput(initialDomains, paths, markers)
 
 	rand.Seed(time.Now().UnixNano())
 
 	printInitialInfo(cfg, initialDomains, paths)
+
+	resultBufferSize := cfg.Concurrency * 2 // Give breathing room
+	if resultBufferSize < 100 {
+		resultBufferSize = 100
+	}
 
 	urlChan := make(chan string, urlBufferSize)
 	resultsChan := make(chan result.Result, resultBufferSize)
@@ -259,9 +264,10 @@ func worker(urls <-chan string, results chan<- result.Result, wg *sync.WaitGroup
 	defer wg.Done()
 
 	for url := range urls {
-		// Acquire semaphore to limit concurrent requests
+		// Acquire semaphore
 		semaphore <- struct{}{}
 
+		// Wait for rate limiter
 		err := limiter.Wait(context.Background())
 		if err != nil {
 			<-semaphore
@@ -271,18 +277,11 @@ func worker(urls <-chan string, results chan<- result.Result, wg *sync.WaitGroup
 		res := client.MakeRequest(url)
 		atomic.AddInt64(processedCount, 1)
 
-		// Send result with timeout to prevent blocking
-		select {
-		case results <- res:
-		case <-time.After(100 * time.Millisecond):
-			// Log dropped result if needed
-		}
+		// FIX: NEVER DROP RESULTS - Block until processed
+		results <- res // This will block if channel is full, ensuring no drops
 
-		// Release semaphore
 		<-semaphore
-
-		// Clear result content to free memory immediately
-		res.Content = ""
+		res.Content = "" // Clear memory
 	}
 }
 
