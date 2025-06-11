@@ -126,6 +126,10 @@ func (c *Client) MakeRequest(url string) result.Result {
 
 	// For small content, convert directly
 	if contentSize <= 32*1024 { // 32KB threshold
+
+		if c.config.Verbose {
+			fmt.Printf("Fetched %s (%d bytes, HTTP: %d)\n", url, totalSize, resp.StatusCode())
+		}
 		return result.Result{
 			URL:         url,
 			Content:     string(body[:contentSize]),
@@ -138,6 +142,10 @@ func (c *Client) MakeRequest(url string) result.Result {
 	// For larger content, make a copy to avoid holding onto the entire response buffer
 	contentCopy := make([]byte, contentSize)
 	copy(contentCopy, body[:contentSize])
+
+	if c.config.Verbose {
+		fmt.Printf("Fetched %s (%d bytes, HTTP: %d)\n", url, totalSize, resp.StatusCode())
+	}
 
 	return result.Result{
 		URL:         url,
