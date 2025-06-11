@@ -138,6 +138,10 @@ func (c *Client) MakeRequest(url string) result.Result {
 		totalSize = int64(totalRead)
 	}
 
+	if c.config.Verbose {
+		fmt.Printf("Fetched %s (%d bytes, HTTP: %d)\n", url, totalSize, resp.StatusCode)
+	}
+
 	return result.Result{
 		URL:         url,
 		Content:     string(content),
