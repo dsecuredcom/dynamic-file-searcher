@@ -57,9 +57,9 @@ func main() {
 
 	printInitialInfo(cfg, initialDomains, paths)
 
-	resultBufferSize := cfg.Concurrency * 2 // Give breathing room
+	resultBufferSize := cfg.Concurrency * 3 // Give breathing room
 	if resultBufferSize < 100 {
-		resultBufferSize = 100
+		resultBufferSize = 120
 	}
 
 	urlChan := make(chan string, urlBufferSize)
