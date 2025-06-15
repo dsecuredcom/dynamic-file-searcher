@@ -41,6 +41,7 @@ type Config struct {
 	EnvAppendWords           string
 	AppendEnvList            []string
 	DisableDuplicateCheck    bool
+	IgnoreBasePathSlash      bool
 }
 
 func ParseFlags() Config {
@@ -70,6 +71,7 @@ func ParseFlags() Config {
 	flag.Int64Var(&cfg.MaxContentRead, "max-content-read", 5*1024*1024, "Maximum size of content to read for marker checking (in bytes)")
 	flag.StringVar(&cfg.HTTPStatusCodes, "http-statuses", "", "HTTP status code to filter (csv allowed)")
 	flag.BoolVar(&cfg.DisableDuplicateCheck, "disable-duplicate-check", false, "Disable duplicate response check by host and size")
+	flag.BoolVar(&cfg.IgnoreBasePathSlash, "ignore-base-path-slash", false, "Don't add leading slash before base paths")
 
 	var proxyURLStr string
 	flag.StringVar(&proxyURLStr, "proxy", "", "Proxy URL (e.g., http://127.0.0.1:8080)")
