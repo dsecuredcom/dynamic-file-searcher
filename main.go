@@ -210,7 +210,9 @@ func streamURLsForDomainWithBackpressure(domainD string, paths []string, cfg *co
 			b.WriteString(proto)
 			b.WriteString("://")
 			b.WriteString(d)
-			b.WriteString("/")
+			if !cfg.IgnoreBasePathSlash {
+				b.WriteString("/")
+			}
 			b.WriteString(base)
 			b.WriteString("/")
 			b.WriteString(path)
