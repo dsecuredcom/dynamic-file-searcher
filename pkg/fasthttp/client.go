@@ -58,7 +58,7 @@ func NewClient(cfg config.Config) *Client {
 			MaxConnsPerHost:               cfg.Concurrency,  // Reduced from cfg.Concurrency * 2
 			MaxIdleConnDuration:           30 * time.Second, // Reduced from 90s
 			MaxConnDuration:               1 * time.Minute,  // Reduced from 10m
-			MaxResponseBodySize:           int(cfg.MaxContentRead),
+			//MaxResponseBodySize:           int(cfg.MaxContentRead),
 			TLSConfig: &tls.Config{
 				InsecureSkipVerify: true,
 			},
