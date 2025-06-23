@@ -1,6 +1,8 @@
 module github.com/dsecuredcom/dynamic-file-searcher
 
-go 1.19
+go 1.23.0
+
+toolchain go1.24.4
 
 require (
 	github.com/fatih/color v1.17.0
