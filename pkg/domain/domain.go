@@ -130,6 +130,29 @@ func StreamDomainParts(host string, cfg *config.Config, callback func(string)) {
 		}
 	}
 
+	if len(parts) > 0 {
+		firstPart := parts[0]
+
+		// Skip purely numeric parts
+		if _, err := strconv.Atoi(firstPart); err != nil && len(firstPart) > 1 {
+			maxPrefixes := 5
+			endIndex := 3 + maxPrefixes
+			if endIndex > len(firstPart) {
+				endIndex = len(firstPart)
+			}
+			for i := 3; i <= endIndex; i++ {
+				sendUnique(firstPart[:i])
+			}
+
+			if len(firstPart) >= 4 {
+				firstChar := string(firstPart[0])
+				lastThree := firstPart[len(firstPart)-3:]
+				combined := firstChar + lastThree
+				sendUnique(combined)
+			}
+		}
+	}
+
 	// Process each part
 	for _, part := range parts {
 		// Skip purely numeric parts
