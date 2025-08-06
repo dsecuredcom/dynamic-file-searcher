@@ -48,11 +48,11 @@ func ParseFlags() Config {
 	cfg := Config{
 		ExtraHeaders: make(map[string]string),
 	}
-	flag.StringVar(&cfg.DomainsFile, "domains", "", "File containing list of domains")
+	flag.StringVar(&cfg.DomainsFile, "domains", "", "File containing list of domains (use '-' for stdin)")
 	flag.StringVar(&cfg.Domain, "domain", "", "Single domain to scan")
-	flag.StringVar(&cfg.PathsFile, "paths", "", "File containing list of paths")
-	flag.StringVar(&cfg.MarkersFile, "markers", "", "File containing list of markers")
-	flag.StringVar(&cfg.BasePathsFile, "base-paths", "", "File containing list of base paths")
+	flag.StringVar(&cfg.PathsFile, "paths", "", "File containing list of paths (use '-' for stdin)")
+	flag.StringVar(&cfg.MarkersFile, "markers", "", "File containing list of markers (use '-' for stdin)")
+	flag.StringVar(&cfg.BasePathsFile, "base-paths", "", "File containing list of base paths (use '-' for stdin)")
 	flag.IntVar(&cfg.Concurrency, "concurrency", 10, "Number of concurrent requests")
 	flag.IntVar(&cfg.HostDepth, "host-depth", 6, "How many sub-subdomains to use for path generation (e.g., 2 = test1-abc & test2 [based on test1-abc.test2.test3.example.com])")
 	flag.BoolVar(&cfg.DontGeneratePaths, "dont-generate-paths", false, "If true, only the base paths (or nothing) will be used for scanning")
