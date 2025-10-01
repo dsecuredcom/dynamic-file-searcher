@@ -122,11 +122,33 @@ func StreamDomainParts(host string, cfg *config.Config, callback func(string)) {
 	// Use smaller map to track sent parts - with initial capacity hint
 	sent := make(map[string]struct{}, len(parts)*3) // Estimate ~3 variants per part
 
+	maxGenerated := cfg.MaxGeneratedWordsPerHost
+	if maxGenerated < 0 {
+		maxGenerated = 0
+	}
+	generatedCount := 0
+	limitReached := false
+
+	emit := func(part string) {
+		if limitReached || part == "" {
+			return
+		}
+		if maxGenerated > 0 && generatedCount >= maxGenerated {
+			limitReached = true
+			return
+		}
+		callback(part)
+		generatedCount++
+	}
+
 	// Helper to send unique parts
 	sendUnique := func(part string) {
+		if limitReached {
+			return
+		}
 		if _, exists := sent[part]; !exists && part != "" && len(part) > 1 {
 			sent[part] = struct{}{}
-			callback(part)
+			emit(part)
 		}
 	}
 
@@ -221,6 +243,9 @@ func StreamDomainParts(host string, cfg *config.Config, callback func(string)) {
 		}
 
 		for _, sentPart := range partsToProcess {
+			if limitReached {
+				break
+			}
 			// Skip if already ends with env suffix
 			hasEnvSuffix := false
 			for _, env := range cfg.AppendEnvList {
@@ -237,15 +262,21 @@ func StreamDomainParts(host string, cfg *config.Config, callback func(string)) {
 					maxEnvs = len(cfg.AppendEnvList)
 				}
 
-				for i := 0; i < maxEnvs; i++ {
+				for i := 0; i < maxEnvs && !limitReached; i++ {
 					env := cfg.AppendEnvList[i]
 					if !strings.Contains(sentPart, env) {
-						callback(sentPart + env)
-						callback(sentPart + "-" + env)
+						emit(sentPart + env)
+						if limitReached {
+							break
+						}
+						emit(sentPart + "-" + env)
+						if limitReached {
+							break
+						}
 						// Skip underscore variant to reduce combinations
-						// callback(sentPart + "_" + env)
+						// emit(sentPart + "_" + env)
 						// Skip slash variant
-						// callback(sentPart + "/" + env)
+						// emit(sentPart + "/" + env)
 					}
 				}
 			}
@@ -255,11 +286,17 @@ func StreamDomainParts(host string, cfg *config.Config, callback func(string)) {
 	// Remove environment suffixes if enabled
 	if cfg.EnvRemoving {
 		for sentPart := range sent {
+			if limitReached {
+				break
+			}
 			if onlyAlphaRegex.MatchString(sentPart) {
 				for _, env := range cfg.AppendEnvList {
 					if strings.HasSuffix(sentPart, env) {
 						cleaned := strings.TrimSuffix(sentPart, env)
-						callback(cleaned)
+						emit(cleaned)
+						if limitReached {
+							break
+						}
 						break
 					}
 				}
@@ -281,9 +318,15 @@ func StreamDomainParts(host string, cfg *config.Config, callback func(string)) {
 		}
 
 		for _, part := range currentParts {
+			if limitReached {
+				break
+			}
 			// Only add first bypass character to reduce combinations
 			if len(byPassCharacters) > 0 {
-				callback(part + byPassCharacters[0])
+				emit(part + byPassCharacters[0])
+				if limitReached {
+					break
+				}
 			}
 		}
 	}

@@ -26,6 +26,7 @@ type Config struct {
 	FastHTTP                 bool
 	ForceHTTPProt            bool
 	HostDepth                int
+	MaxGeneratedWordsPerHost int
 	AppendByPassesToWords    bool
 	SkipRootFolderCheck      bool
 	BasePaths                []string
@@ -55,6 +56,7 @@ func ParseFlags() Config {
 	flag.StringVar(&cfg.BasePathsFile, "base-paths", "", "File containing list of base paths (use '-' for stdin)")
 	flag.IntVar(&cfg.Concurrency, "concurrency", 10, "Number of concurrent requests")
 	flag.IntVar(&cfg.HostDepth, "host-depth", 6, "How many sub-subdomains to use for path generation (e.g., 2 = test1-abc & test2 [based on test1-abc.test2.test3.example.com])")
+	flag.IntVar(&cfg.MaxGeneratedWordsPerHost, "max-generated-words", 0, "Maximum number of generated words per host (0 = unlimited)")
 	flag.BoolVar(&cfg.DontGeneratePaths, "dont-generate-paths", false, "If true, only the base paths (or nothing) will be used for scanning")
 	flag.DurationVar(&cfg.Timeout, "timeout", 12*time.Second, "Timeout for each request")
 	flag.BoolVar(&cfg.Verbose, "verbose", false, "Verbose output")

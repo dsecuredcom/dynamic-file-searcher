@@ -106,6 +106,7 @@ or
 - `-force-http`: Force HTTP (instead of HTTPS) requests (default: false)
 - `-use-fasthttp`: Use fasthttp instead of net/http (default: false)
 - `-host-depth`: How many sub-subdomains to use for path generation (e.g., 2 = test1-abc & test2 [based on test1-abc.test2.test3.example.com])
+- `-max-generated-words`: Maximum number of generated words per host (0 = unlimited)
 - `-dont-generate-paths`: Don't generate paths based on host structure (default: false)
 - `-dont-append-envs`: Prevent appending environment variables to requests (-qa, ...) (default: false)
 - `-append-bypasses-to-words`: Append bypasses to words (admin -> admin; -> admin..;) (default: false)
@@ -159,6 +160,7 @@ or
 There are basically some very important flags that you should understand before using the tool. These flags are:
 
 - `-host-depth`
+- `-max-generated-words`
 - `-dont-generate-paths`
 - `-dont-append-envs`
 - `-append-bypasses-to-words`
@@ -171,6 +173,12 @@ Given the following host structure: `housetodo.some-word.thisthat.example.com`
 This flag is used to determine how many sub-subdomains to use for path generation. For example, if `-host-depth` is set
 to 2, the tool will generate paths based on `housetodo.some-word`. If `-host-depth` is set to 1, the tool will generate
 paths based on `housetodo` only.
+
+### max-generated-words
+
+Hosts with long subdomain chains can explode the number of generated words. Use `-max-generated-words` to keep only the
+first _n_ generated words per host (set `0` to disable the cap). This is helpful when you want to constrain large target
+lists while still benefiting from automatic word extraction.
 
 ### dont-generate-paths
 
